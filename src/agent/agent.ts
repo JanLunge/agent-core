@@ -18,6 +18,7 @@ export interface AgentRuntime {
   readonly registry: ToolRegistry;
   status: AgentStatus;
   getOrCreateConversation(channelId: string): Conversation;
+  resetConversation(channelId: string): void;
   processMessage(
     channelId: string,
     message: string,
@@ -52,6 +53,13 @@ export function createAgent(options: CreateAgentOptions): AgentRuntime {
 
     getOrCreateConversation(channelId: string): Conversation {
       return createConversation(config.name, channelId, store);
+    },
+
+    resetConversation(channelId: string): void {
+      const existing = store.findActiveConversation(config.name, channelId);
+      if (existing) {
+        store.updateStatus(existing.id, 'ended');
+      }
     },
 
     async processMessage(

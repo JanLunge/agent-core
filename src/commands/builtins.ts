@@ -8,10 +8,13 @@ export interface CommandContext {
   status: string;
   traceStore?: TraceStore;
   skills?: SkillManifest[];
+  /** End the current conversation so the next message starts fresh. */
+  resetConversation?: () => void;
 }
 
 export interface CommandResult {
   text: string;
+  action?: 'reset';
 }
 
 const BUILTINS: Record<string, (args: string, ctx: CommandContext) => CommandResult> = {
@@ -21,7 +24,8 @@ const BUILTINS: Record<string, (args: string, ctx: CommandContext) => CommandRes
       '  /help       — show this list',
       '  /status     — show agent name, model, conversation ID, status',
       '  /model      — show current model',
-      '  /reset      — reset the conversation',
+      '  /reset      — end current conversation and start fresh',
+      '  /new        — same as /reset',
       '  /history    — show message count for this conversation',
       '  /debug      — show last turn trace (tokens, tools, duration)',
       '  /skills     — list loaded skills',
@@ -46,9 +50,15 @@ const BUILTINS: Record<string, (args: string, ctx: CommandContext) => CommandRes
     return { text: `Current model: ${ctx.model}` };
   },
 
-  reset: () => ({
-    text: 'To reset, use /quit and start a new session. (Conversation wipe coming soon.)',
-  }),
+  reset: (_args, ctx) => {
+    if (ctx.resetConversation) ctx.resetConversation();
+    return { text: 'Conversation reset. Starting fresh.', action: 'reset' as const };
+  },
+
+  new: (_args, ctx) => {
+    if (ctx.resetConversation) ctx.resetConversation();
+    return { text: 'New conversation started.', action: 'reset' as const };
+  },
 
   history: (_args, ctx) => ({
     text: `Conversation ${ctx.conversationId} — use getHistory() for message details.`,

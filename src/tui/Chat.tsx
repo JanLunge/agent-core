@@ -80,10 +80,15 @@ export function Chat({ router, agentName, channelId, verbose }: AppProps) {
           model: agent.config.model,
           conversationId: conversation.id,
           status: agent.status,
+          resetConversation: () => agent.resetConversation(channelId),
         };
         const result = handleBuiltin(cmd.name, cmd.args, cmdContext);
         if (result) {
-          setMessages((prev) => [...prev, { role: 'system', content: result.text }]);
+          if (result.action === 'reset') {
+            setMessages([{ role: 'system', content: result.text }]);
+          } else {
+            setMessages((prev) => [...prev, { role: 'system', content: result.text }]);
+          }
           return;
         }
       }
