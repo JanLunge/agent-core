@@ -9,6 +9,11 @@ import type { Router } from '../router/router.js';
 import type { TraceStore, TraceEntry } from '../journal/trace.js';
 import type { MemoryStore } from '../memory/store.js';
 import type { ConversationStore } from '../conversation/persistence.js';
+import type { StreamChunk } from '../llm/types.js';
+import type { ApprovalResult } from '../tools/approval.js';
+import { parseCommand } from '../commands/parser.js';
+import { handleBuiltin } from '../commands/builtins.js';
+import type { ClientMessage, ServerMessage } from './chat-protocol.js';
 interface WsLike {
   readyState: number;
   send(data: string): void;
@@ -68,9 +73,109 @@ export function createGateway(options: GatewayOptions): Gateway {
     fastify.get('/ws', { websocket: true }, (socket) => {
       clients.add(socket);
       socket.on('close', () => clients.delete(socket));
-      socket.send(JSON.stringify({ type: 'connected', data: { uptime: Date.now() - startTime } }));
+
+      // Send initial state
+      const agents = router.listAgents();
+      const agentList = Array.from(agents.entries()).map(([name, a]) => ({
+        name, model: a.config.model, status: a.status,
+      }));
+      send(socket, { type: 'connected', agents: agentList });
+
+      // Per-client state for approval flow
+      let pendingApproval: ((result: ApprovalResult) => void) | null = null;
+
+      socket.on('message', (raw: Buffer | string) => {
+        let msg: ClientMessage;
+        try { msg = JSON.parse(typeof raw === 'string' ? raw : raw.toString()); }
+        catch { return; }
+
+        if (msg.type === 'message' && msg.channelId && msg.text) {
+          handleChatMessage(socket, msg.channelId, msg.text, (resolve) => {
+            pendingApproval = resolve;
+          });
+        } else if (msg.type === 'approval_response' && pendingApproval) {
+          const resolve = pendingApproval;
+          pendingApproval = null;
+          if (msg.feedback) {
+            resolve({ action: 'feedback', message: msg.feedback });
+          } else if (msg.rewrittenArgs) {
+            resolve({ action: 'rewrite', args: msg.rewrittenArgs });
+          } else if (msg.approve) {
+            resolve({ action: 'approve' });
+          } else {
+            resolve({ action: 'deny', reason: 'Denied by user.' });
+          }
+        } else if (msg.type === 'command' && msg.channelId && msg.name) {
+          handleCommand(socket, msg.channelId, msg.name, msg.args ?? '');
+        }
+      });
     });
   });
+
+  function send(socket: WsLike, msg: ServerMessage): void {
+    if (socket.readyState === 1) socket.send(JSON.stringify(msg));
+  }
+
+  async function handleChatMessage(
+    socket: WsLike,
+    channelId: string,
+    text: string,
+    setApprovalResolver: (resolve: (result: ApprovalResult) => void) => void,
+  ): Promise<void> {
+    const onStream = (chunk: StreamChunk) => {
+      if (chunk.type === 'text' && chunk.text) {
+        send(socket, { type: 'stream', text: chunk.text });
+      }
+    };
+
+    const onApproval = async (request: { toolName: string; args: Record<string, unknown> }) => {
+      send(socket, { type: 'approval_request', toolName: request.toolName, args: request.args });
+      return new Promise<ApprovalResult>((resolve) => {
+        setApprovalResolver(resolve);
+      });
+    };
+
+    try {
+      const result = await router.route(
+        { channelType: 'tui', chatId: channelId, text, sender: 'ws-client' },
+        onStream,
+        onApproval,
+      );
+      send(socket, {
+        type: 'done',
+        reply: result.reply,
+        usage: result.usage,
+        toolResults: result.toolResults.map((r) => ({
+          name: r.name, durationMs: r.durationMs, error: r.error,
+        })),
+      });
+    } catch (err) {
+      send(socket, { type: 'error', message: err instanceof Error ? err.message : String(err) });
+    }
+  }
+
+  function handleCommand(socket: WsLike, channelId: string, name: string, args: string): void {
+    // Get first agent for context
+    const agents = router.listAgents();
+    const firstAgent = agents.values().next().value;
+    if (!firstAgent) {
+      send(socket, { type: 'error', message: 'No agents registered' });
+      return;
+    }
+    const conversation = firstAgent.getOrCreateConversation(channelId);
+    const result = handleBuiltin(name, args, {
+      agentName: firstAgent.config.name,
+      model: firstAgent.config.model,
+      conversationId: conversation.id,
+      status: firstAgent.status,
+      resetConversation: () => firstAgent.resetConversation(channelId),
+    });
+    if (result) {
+      send(socket, { type: 'command_result', text: result.text, action: result.action });
+    } else {
+      send(socket, { type: 'error', message: `Unknown command: /${name}` });
+    }
+  }
 
   // --- HTTP routes ---
 

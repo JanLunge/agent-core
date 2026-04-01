@@ -7,7 +7,6 @@ import { createProvider, initProviders } from '../llm/client.js';
 import { createAgent } from '../agent/agent.js';
 import { ConversationStore } from '../conversation/persistence.js';
 import { createRouter } from '../router/router.js';
-import { startTui } from '../tui/app.js';
 import { ToolRegistry } from '../tools/registry.js';
 import { registerCoreTools } from '../tools/core.js';
 import { loadMcpServers } from '../tools/mcp-loader.js';
@@ -18,6 +17,7 @@ import { MemoryStore } from '../memory/store.js';
 import { TelegramConnector } from '../channel/telegram/connector.js';
 import { HeartbeatScheduler } from '../heartbeat/scheduler.js';
 import { createGateway } from '../gateway/server.js';
+import { startWsChat } from '../tui/ws-client.js';
 
 const program = new Command();
 
@@ -92,20 +92,16 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
 
 program
   .command('chat')
-  .description('Start an interactive chat session with an agent')
-  .option('-d, --dir <path>', 'Base directory for config, roles, agents', '.')
-  .option('-a, --agent <name>', 'Agent name to chat with (defaults to first found)')
-  .option('-m, --model <model>', 'Override the model (e.g. claude-sonnet-4, gpt-4o)')
+  .description('Connect to a running agent-core server and chat')
+  .option('-u, --url <url>', 'Gateway WebSocket URL', 'ws://localhost:3120/ws')
+  .option('-c, --channel <id>', 'Channel ID for this session (auto-generated if omitted)')
   .option('-v, --verbose', 'Show token usage and debug info')
   .action(async (opts) => {
-    const { cleanup, router, agentConfig } = await setupAgent(opts);
-
-    const shutdown = () => { console.log('\nShutting down...'); cleanup(); process.exit(0); };
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
-
-    await startTui({ router, agentName: agentConfig.name, verbose: opts.verbose });
-    cleanup();
+    await startWsChat({
+      url: opts.url,
+      channelId: opts.channel,
+      verbose: opts.verbose,
+    });
   });
 
 program
