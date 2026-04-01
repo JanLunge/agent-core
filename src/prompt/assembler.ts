@@ -60,8 +60,47 @@ export function buildToolsSection(tools: ToolDefinition[]): PromptSection {
 }
 
 /**
+ * Builds a memory section by searching the brain for content relevant
+ * to the latest user message. Injected into the system prompt so the
+ * agent "just knows" things without having to call memory_search.
+ */
+function buildMemorySection(brain: Brain, history: Message[]): PromptSection {
+  if (!brain.memoryStore) {
+    return { name: 'memory', content: '', tokens: 0, priority: 90 };
+  }
+
+  // Extract a search query from recent user messages
+  const recentUserMessages = history
+    .filter((m) => m.role === 'user')
+    .slice(-3)
+    .map((m) => m.content);
+
+  if (recentUserMessages.length === 0) {
+    return { name: 'memory', content: '', tokens: 0, priority: 90 };
+  }
+
+  const query = recentUserMessages.join(' ');
+  const results = brain.search(query, 5);
+
+  if (results.length === 0) {
+    return { name: 'memory', content: '', tokens: 0, priority: 90 };
+  }
+
+  const entries = results.map((r) => `- [${r.key}]: ${r.content}`).join('\n');
+  const content = `Things you remember that may be relevant:\n${entries}`;
+
+  return {
+    name: 'memory',
+    content,
+    tokens: estimateTokens(content),
+    priority: 90,
+  };
+}
+
+/**
  * Assembles the complete prompt.
  * - Builds sections, fits within system budget (highest priority first)
+ * - Automatically injects relevant memories from the brain
  * - Trims history to fit history budget (keeps most recent messages)
  */
 export function assemblePrompt(options: AssembleOptions): AssembledPrompt {
@@ -70,8 +109,9 @@ export function assemblePrompt(options: AssembleOptions): AssembledPrompt {
 
   // Build and sort sections by priority (highest first)
   const sections: PromptSection[] = [
-    buildIdentitySection(brain),
-    buildToolsSection(tools),
+    buildIdentitySection(brain),       // priority 100
+    buildMemorySection(brain, history), // priority 90
+    buildToolsSection(tools),          // priority 80
   ].sort((a, b) => b.priority - a.priority);
 
   // Fit sections within system budget
