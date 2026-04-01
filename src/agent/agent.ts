@@ -2,6 +2,7 @@ import type { ResolvedAgent } from '../config/schema.js';
 import type { LLMProvider, StreamChunk } from '../llm/types.js';
 import { createBrain, type Brain } from '../memory/brain.js';
 import type { MemoryStore } from '../memory/store.js';
+import type { IdentityStore } from '../memory/identity-store.js';
 import { ConversationStore } from '../conversation/persistence.js';
 import { createConversation, type Conversation } from '../conversation/conversation.js';
 import { runTurn, type TurnResult, type LoopOptions } from '../conversation/loop.js';
@@ -34,13 +35,14 @@ export interface CreateAgentOptions {
   store: ConversationStore;
   registry: ToolRegistry;
   memoryStore?: MemoryStore;
+  identityStore?: IdentityStore;
   toolPolicy?: ToolPolicy;
   traceStore?: TraceStore;
   baseDir: string;
 }
 
 export function createAgent(options: CreateAgentOptions): AgentRuntime {
-  const { config, provider, store, registry, memoryStore, toolPolicy, traceStore, baseDir } = options;
+  const { config, provider, store, registry, memoryStore, identityStore, toolPolicy, traceStore, baseDir } = options;
   const brain = createBrain(config, baseDir, memoryStore);
   let status: AgentStatus = 'idle';
 
@@ -77,6 +79,7 @@ export function createAgent(options: CreateAgentOptions): AgentRuntime {
           conversationId: conversation.id,
           baseDir,
           brain,
+          identityStore,
         };
         const loopOptions: LoopOptions = {
           conversation,

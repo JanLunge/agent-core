@@ -20,8 +20,11 @@ export function createBrain(
   memoryStore?: MemoryStore,
   embedder?: EmbeddingProvider,
 ): Brain {
-  let identity = loadIdentityFiles(agent.personality, agent.knowsAbout, baseDir);
+  // Store config so we can re-read from disk on each turn
+  let personality = agent.personality;
+  let knowsAbout = agent.knowsAbout;
   let systemPrompt = agent.systemPrompt;
+  let identity = loadIdentityFiles(personality, knowsAbout, baseDir);
 
   const brain: Brain = {
     agentName: agent.name,
@@ -29,12 +32,18 @@ export function createBrain(
     memoryStore,
 
     reload(updated: ResolvedAgent, updatedBaseDir: string) {
-      identity = loadIdentityFiles(updated.personality, updated.knowsAbout, updatedBaseDir);
+      personality = updated.personality;
+      knowsAbout = updated.knowsAbout;
       systemPrompt = updated.systemPrompt;
+      identity = loadIdentityFiles(personality, knowsAbout, updatedBaseDir);
       brain.identity = identity;
     },
 
     getSystemPromptSections(): string[] {
+      // Re-read from disk each time so agent self-modifications take effect
+      identity = loadIdentityFiles(personality, knowsAbout, baseDir);
+      brain.identity = identity;
+
       const sections: string[] = [];
       if (identity.personality) sections.push(identity.personality);
       for (const content of identity.knowsAbout) sections.push(content);
@@ -44,11 +53,6 @@ export function createBrain(
 
     search(query: string, limit = 10): MemoryEntry[] {
       if (!memoryStore) return [];
-      if (embedder) {
-        // Fire-and-forget async with sync fallback
-        // For sync interface, use FTS as baseline — caller can use searchAsync for hybrid
-        return memoryStore.search(agent.name, query, limit);
-      }
       return memoryStore.search(agent.name, query, limit);
     },
 
@@ -59,7 +63,6 @@ export function createBrain(
           const queryEmbedding = await embedder.embed(query);
           return memoryStore.hybridSearch(agent.name, query, queryEmbedding, limit);
         } catch {
-          // Fall back to FTS-only if embedding fails
           return memoryStore.search(agent.name, query, limit);
         }
       }
@@ -69,11 +72,9 @@ export function createBrain(
     remember(key: string, content: string): void {
       if (!memoryStore) return;
       if (embedder) {
-        // Embed in background, write immediately with FTS
         embedder.embed(content).then((embedding) => {
           memoryStore.writeWithEmbedding(agent.name, key, content, embedding);
         }).catch(() => {
-          // Embedding failed, but text is already written via writeWithEmbedding's call to write()
           memoryStore.write(agent.name, key, content);
         });
         return;

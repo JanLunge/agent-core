@@ -234,6 +234,124 @@ export function registerCoreTools(registry: ToolRegistry): void {
       return `Remembered "${key}".`;
     },
   );
+
+  // --- identity_read ---
+  registry.register(
+    'identity_read',
+    "Read a section of your own identity (personality, instructions, self-knowledge). Use this to see who you are before making changes.",
+    {
+      type: 'object',
+      properties: {
+        section: {
+          type: 'string',
+          description: 'Section name: "personality" (your SOUL.md), or any custom section name',
+        },
+      },
+      required: ['section'],
+    },
+    async (args, context) => {
+      if (!context.identityStore) return 'Identity store not available.';
+      const section = args.section as string;
+      const content = context.identityStore.getCurrent(section);
+      if (!content) return `Section "${section}" not found. Available: ${context.identityStore.listSections().join(', ') || '(none)'}`;
+      return content;
+    },
+  );
+
+  // --- identity_update ---
+  registry.register(
+    'identity_update',
+    "Update a section of your own identity. This changes who you are — your personality, instructions, or self-knowledge. Every change is versioned. Read the current content first with identity_read before making changes.",
+    {
+      type: 'object',
+      properties: {
+        section: {
+          type: 'string',
+          description: 'Section name: "personality" (your SOUL.md), or any custom section name',
+        },
+        content: {
+          type: 'string',
+          description: 'The new full content for this section',
+        },
+        reason: {
+          type: 'string',
+          description: 'Why you are making this change (logged in version history)',
+        },
+      },
+      required: ['section', 'content', 'reason'],
+    },
+    async (args, context) => {
+      if (!context.identityStore) return 'Identity store not available.';
+      const section = args.section as string;
+      const content = args.content as string;
+      const reason = args.reason as string;
+      const rev = context.identityStore.update(section, content, 'agent', reason);
+      // Trigger brain reload so the change takes effect on the next turn
+      if (context.brain) {
+        // The brain will pick up the new file content on next getSystemPromptSections() call
+        // since identity files are re-read from disk
+      }
+      return `Updated "${section}" (revision ${rev.id}). Reason: ${reason}\nThis takes effect on your next response.`;
+    },
+  );
+
+  // --- identity_history ---
+  registry.register(
+    'identity_history',
+    "View the version history of an identity section. See what changed, when, and why.",
+    {
+      type: 'object',
+      properties: {
+        section: {
+          type: 'string',
+          description: 'Section name to view history for',
+        },
+        limit: {
+          type: 'number',
+          description: 'Number of revisions to show (default 10)',
+        },
+      },
+      required: ['section'],
+    },
+    async (args, context) => {
+      if (!context.identityStore) return 'Identity store not available.';
+      const section = args.section as string;
+      const limit = (args.limit as number) ?? 10;
+      const history = context.identityStore.getHistory(section, limit);
+      if (history.length === 0) return `No history for "${section}".`;
+      return history.map((r) =>
+        `[rev ${r.id}] ${r.created_at} by ${r.author}: ${r.reason}\n  ${r.content.slice(0, 150)}${r.content.length > 150 ? '...' : ''}`,
+      ).join('\n\n');
+    },
+  );
+
+  // --- identity_revert ---
+  registry.register(
+    'identity_revert',
+    "Revert an identity section to a previous revision.",
+    {
+      type: 'object',
+      properties: {
+        section: {
+          type: 'string',
+          description: 'Section name to revert',
+        },
+        revision_id: {
+          type: 'number',
+          description: 'Revision ID to revert to (find with identity_history)',
+        },
+      },
+      required: ['section', 'revision_id'],
+    },
+    async (args, context) => {
+      if (!context.identityStore) return 'Identity store not available.';
+      const section = args.section as string;
+      const revisionId = args.revision_id as number;
+      const rev = context.identityStore.revert(section, revisionId);
+      if (!rev) return `Could not revert: revision ${revisionId} not found for section "${section}".`;
+      return `Reverted "${section}" to revision ${revisionId} (now revision ${rev.id}). Takes effect on next response.`;
+    },
+  );
 }
 
 // --- helpers ---

@@ -5,6 +5,7 @@ export interface ToolContext {
   conversationId: string;
   baseDir: string;
   brain?: import('../memory/brain.js').Brain;
+  identityStore?: import('../memory/identity-store.js').IdentityStore;
 }
 
 export type ToolHandler = (

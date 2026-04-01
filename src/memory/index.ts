@@ -6,3 +6,4 @@ export {
   createOllamaEmbedder,
   createOpenAIEmbedder,
 } from './embeddings.js';
+export { IdentityStore, type IdentityRevision } from './identity-store.js';

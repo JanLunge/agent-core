@@ -14,6 +14,7 @@ import type { McpConnection } from '../tools/mcp-client.js';
 import { createToolPolicy } from '../tools/policy.js';
 import { TraceStore } from '../journal/trace.js';
 import { MemoryStore } from '../memory/store.js';
+import { IdentityStore } from '../memory/identity-store.js';
 import { TelegramConnector } from '../channel/telegram/connector.js';
 import { HeartbeatScheduler } from '../heartbeat/scheduler.js';
 import { createGateway } from '../gateway/server.js';
@@ -58,6 +59,12 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
   const store = new ConversationStore(dataDir);
   const traceStore = new TraceStore(dataDir);
   const memoryStore = new MemoryStore(dataDir);
+  const identityStore = new IdentityStore(dataDir, baseDir);
+
+  // Import initial identity files into the versioned store
+  if (agentConfig.personality) {
+    identityStore.importFromDisk('personality', agentConfig.personality);
+  }
 
   const registry = new ToolRegistry();
   registerCoreTools(registry);
@@ -74,7 +81,7 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
     auto: ['memory_search', 'memory_write'],
   });
 
-  const agent = createAgent({ config: agentConfig, provider, store, registry, memoryStore, toolPolicy, traceStore, baseDir });
+  const agent = createAgent({ config: agentConfig, provider, store, registry, memoryStore, identityStore, toolPolicy, traceStore, baseDir });
   const router = createRouter();
   router.registerAgent(agentConfig.name, agent);
   router.setDefaultAgent(agentConfig.name);
@@ -84,6 +91,7 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
     store.close();
     traceStore.close();
     memoryStore.close();
+    identityStore.close();
     for (const conn of mcpConnections) conn.close();
   };
 
