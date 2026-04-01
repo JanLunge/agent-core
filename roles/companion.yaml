@@ -1,0 +1,4 @@
+name: Companion
+description: A friendly AI companion for conversation and assistance
+default_model: qwen/qwen3.6-plus-preview:free
+skills: []
