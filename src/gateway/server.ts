@@ -226,15 +226,21 @@ export function createGateway(options: GatewayOptions): Gateway {
     const limit = request.query.limit ? parseInt(request.query.limit, 10) : 50;
     const rows = conversationStore.listConversations(limit);
     return {
-      conversations: rows.map((r) => ({
-        id: r.id,
-        agentName: r.agent_name,
-        channelId: r.channel_id,
-        status: r.status,
-        messageCount: conversationStore.countMessages(r.id),
-        createdAt: r.created_at,
-        updatedAt: r.updated_at,
-      })),
+      conversations: rows.map((r) => {
+        const last = conversationStore.getLastMessage(r.id);
+        return {
+          id: r.id,
+          agentName: r.agent_name,
+          channelId: r.channel_id,
+          status: r.status,
+          messageCount: conversationStore.countMessages(r.id),
+          createdAt: r.created_at,
+          updatedAt: r.updated_at,
+          lastMessageAt: last?.created_at,
+          lastMessageRole: last?.role,
+          lastMessageExcerpt: last ? last.content.slice(0, 100) + (last.content.length > 100 ? '...' : '') : undefined,
+        };
+      }),
     };
   });
 

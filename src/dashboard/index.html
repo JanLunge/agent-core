@@ -334,8 +334,17 @@ async function loadConversations() {
     const select = document.getElementById('convSelect');
     const current = select.value;
     select.innerHTML = '<option value="">Select a conversation...</option>';
-    for (const c of (data.conversations || [])) {
-      const label = `${c.agentName} — ${c.channelId} (${c.messageCount} msgs, ${c.status})`;
+    // Sort by last message time (most recent first)
+    const convos = (data.conversations || []).sort((a, b) =>
+      (b.lastMessageAt || b.updatedAt || '').localeCompare(a.lastMessageAt || a.updatedAt || '')
+    );
+    for (const c of convos) {
+      const time = c.lastMessageAt || c.updatedAt || '';
+      const timeShort = time ? new Date(time + 'Z').toLocaleString() : '';
+      const excerpt = c.lastMessageExcerpt
+        ? ` — "${c.lastMessageExcerpt.slice(0, 50)}${c.lastMessageExcerpt.length > 50 ? '…' : ''}"`
+        : '';
+      const label = `${c.agentName} · ${c.messageCount} msgs · ${timeShort}${excerpt}`;
       const opt = document.createElement('option');
       opt.value = c.id;
       opt.textContent = label;

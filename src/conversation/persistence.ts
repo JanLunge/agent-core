@@ -114,6 +114,12 @@ export class ConversationStore {
     return row.count;
   }
 
+  getLastMessage(conversationId: string): { role: string; content: string; created_at: string } | undefined {
+    return this.db.prepare(
+      'SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1',
+    ).get(conversationId) as { role: string; content: string; created_at: string } | undefined;
+  }
+
   close(): void {
     this.db.close();
   }
