@@ -191,10 +191,12 @@
   <!-- Traces Panel -->
   <div id="traces" class="panel">
     <div class="controls">
-      <input type="text" id="convIdInput" placeholder="Conversation ID (e.g. cli:default)">
-      <button onclick="loadTraces()">Load Traces</button>
+      <select id="convSelect" onchange="loadTraces()">
+        <option value="">Select a conversation...</option>
+      </select>
+      <button onclick="loadConversations()">Refresh</button>
     </div>
-    <div id="traceList"><div class="empty">Enter a conversation ID to view traces</div></div>
+    <div id="traceList"><div class="empty">Select a conversation to view traces</div></div>
   </div>
 
   <!-- Memory Panel -->
@@ -253,8 +255,7 @@ function connectWs() {
 connectWs();
 
 function handleLiveTrace(trace) {
-  // If we're viewing the same conversation, append the trace
-  const convId = document.getElementById('convIdInput').value.trim();
+  const convId = document.getElementById('convSelect').value;
   if (convId && trace.conversationId === convId) {
     const container = document.getElementById('traceList');
     const empty = container.querySelector('.empty');
@@ -325,9 +326,34 @@ async function loadAgentDetail(name, btn) {
   }
 }
 
-// --- Traces ---
+// --- Conversations + Traces ---
+async function loadConversations() {
+  try {
+    const res = await fetch(`${BASE}/api/conversations`);
+    const data = await res.json();
+    const select = document.getElementById('convSelect');
+    const current = select.value;
+    select.innerHTML = '<option value="">Select a conversation...</option>';
+    for (const c of (data.conversations || [])) {
+      const label = `${c.agentName} — ${c.channelId} (${c.messageCount} msgs, ${c.status})`;
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = label;
+      select.appendChild(opt);
+    }
+    if (current) select.value = current;
+    // Auto-select the most recent if nothing selected
+    if (!select.value && data.conversations?.length > 0) {
+      select.value = data.conversations[0].id;
+      loadTraces();
+    }
+  } catch (err) {
+    console.error('Failed to load conversations:', err);
+  }
+}
+
 async function loadTraces() {
-  const convId = document.getElementById('convIdInput').value.trim();
+  const convId = document.getElementById('convSelect').value;
   if (!convId) return;
   const container = document.getElementById('traceList');
   container.innerHTML = '<div class="empty">Loading...</div>';
@@ -456,6 +482,7 @@ function esc(str) {
 
 // --- Init ---
 loadAgents();
+loadConversations();
 loadToolStats();
 </script>
 </body>

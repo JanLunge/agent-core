@@ -101,6 +101,19 @@ export class ConversationStore {
     return rows.map(rowToMessage);
   }
 
+  listConversations(limit = 50): ConversationRow[] {
+    return this.db.prepare(
+      'SELECT * FROM conversations ORDER BY updated_at DESC LIMIT ?',
+    ).all(limit) as ConversationRow[];
+  }
+
+  countMessages(conversationId: string): number {
+    const row = this.db.prepare(
+      'SELECT COUNT(*) as count FROM messages WHERE conversation_id = ?',
+    ).get(conversationId) as { count: number };
+    return row.count;
+  }
+
   close(): void {
     this.db.close();
   }

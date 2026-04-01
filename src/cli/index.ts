@@ -115,7 +115,7 @@ program
   .option('-a, --agent <name>', 'Agent name (defaults to first found)')
   .option('-m, --model <model>', 'Override the model')
   .action(async (opts) => {
-    const { config, agentConfig, agent, router, traceStore, memoryStore, cleanup } = await setupAgent(opts);
+    const { config, agentConfig, agent, router, traceStore, memoryStore, store, cleanup } = await setupAgent(opts);
 
     const shutdownHandlers: (() => void)[] = [cleanup];
 
@@ -125,6 +125,7 @@ program
       router,
       traceStore,
       memoryStore,
+      conversationStore: store,
     });
     await gateway.start();
     shutdownHandlers.push(() => { gateway.stop(); });

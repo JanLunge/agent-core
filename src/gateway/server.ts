@@ -8,6 +8,7 @@ import { existsSync } from 'node:fs';
 import type { Router } from '../router/router.js';
 import type { TraceStore, TraceEntry } from '../journal/trace.js';
 import type { MemoryStore } from '../memory/store.js';
+import type { ConversationStore } from '../conversation/persistence.js';
 interface WsLike {
   readyState: number;
   send(data: string): void;
@@ -21,6 +22,7 @@ export interface GatewayOptions {
   router: Router;
   traceStore: TraceStore;
   memoryStore: MemoryStore;
+  conversationStore: ConversationStore;
 }
 
 export interface Gateway {
@@ -37,6 +39,7 @@ export function createGateway(options: GatewayOptions): Gateway {
     router,
     traceStore,
     memoryStore,
+    conversationStore,
   } = options;
 
   const startTime = Date.now();
@@ -110,6 +113,22 @@ export function createGateway(options: GatewayOptions): Gateway {
       status: agent.status,
       systemPrompt: agent.config.systemPrompt?.substring(0, 200),
       tools,
+    };
+  });
+
+  app.get<{ Querystring: { limit?: string } }>('/api/conversations', async (request) => {
+    const limit = request.query.limit ? parseInt(request.query.limit, 10) : 50;
+    const rows = conversationStore.listConversations(limit);
+    return {
+      conversations: rows.map((r) => ({
+        id: r.id,
+        agentName: r.agent_name,
+        channelId: r.channel_id,
+        status: r.status,
+        messageCount: conversationStore.countMessages(r.id),
+        createdAt: r.created_at,
+        updatedAt: r.updated_at,
+      })),
     };
   });
 
