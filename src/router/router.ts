@@ -19,6 +19,7 @@ export interface Router {
     onStream?: (chunk: StreamChunk) => void,
     onApproval?: ApprovalCallback,
   ): Promise<TurnResult>;
+  resetChannel(channelType: string, chatId: string): void;
   setDefaultAgent(name: string): void;
 }
 
@@ -68,6 +69,16 @@ export function createRouter(): Router {
 
       const channelId = bindingKey;
       return agent.processMessage(channelId, message.text, onStream, onApproval);
+    },
+
+    resetChannel(channelType: string, chatId: string): void {
+      const bindingKey = `${channelType}:${chatId}`;
+      const agentName = bindings.get(bindingKey) ?? defaultAgentName;
+      if (agentName) {
+        const agent = agents.get(agentName);
+        if (agent) agent.resetConversation(bindingKey);
+      }
+      bindings.delete(bindingKey);
     },
 
     setDefaultAgent(name: string): void {

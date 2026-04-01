@@ -155,20 +155,21 @@ export function createGateway(options: GatewayOptions): Gateway {
   }
 
   function handleCommand(socket: WsLike, channelId: string, name: string, args: string): void {
-    // Get first agent for context
     const agents = router.listAgents();
     const firstAgent = agents.values().next().value;
     if (!firstAgent) {
       send(socket, { type: 'error', message: 'No agents registered' });
       return;
     }
-    const conversation = firstAgent.getOrCreateConversation(channelId);
+    // Use the same binding key format the router uses for messages
+    const bindingKey = `tui:${channelId}`;
+    const conversation = firstAgent.getOrCreateConversation(bindingKey);
     const result = handleBuiltin(name, args, {
       agentName: firstAgent.config.name,
       model: firstAgent.config.model,
       conversationId: conversation.id,
       status: firstAgent.status,
-      resetConversation: () => firstAgent.resetConversation(channelId),
+      resetConversation: () => router.resetChannel('tui', channelId),
     });
     if (result) {
       send(socket, { type: 'command_result', text: result.text, action: result.action });
