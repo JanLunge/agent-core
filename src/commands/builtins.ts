@@ -1,8 +1,11 @@
+import type { TraceStore, ToolCallEntry } from '../journal/trace.js';
+
 export interface CommandContext {
   agentName: string;
   model: string;
   conversationId: string;
   status: string;
+  traceStore?: TraceStore;
 }
 
 export interface CommandResult {
@@ -18,6 +21,7 @@ const BUILTINS: Record<string, (args: string, ctx: CommandContext) => CommandRes
       '  /model      — show current model',
       '  /reset      — reset the conversation',
       '  /history    — show message count for this conversation',
+      '  /debug      — show last turn trace (tokens, tools, duration)',
     ].join('\n'),
   }),
 
@@ -46,6 +50,42 @@ const BUILTINS: Record<string, (args: string, ctx: CommandContext) => CommandRes
   history: (_args, ctx) => ({
     text: `Conversation ${ctx.conversationId} — use getHistory() for message details.`,
   }),
+
+  debug: (_args, ctx) => {
+    if (!ctx.traceStore) {
+      return { text: 'Trace store not available.' };
+    }
+
+    const traces = ctx.traceStore.getTraces(ctx.conversationId, 1);
+    if (traces.length === 0) {
+      return { text: 'No traces recorded yet.' };
+    }
+
+    const t = traces[0];
+    const toolLines = t.toolCalls.length === 0
+      ? '  (none)'
+      : t.toolCalls.map((tc: ToolCallEntry) => {
+          const status = tc.error ? `error: ${tc.error}` : 'ok';
+          return `  - ${tc.name} (${tc.durationMs}ms, ${status})`;
+        }).join('\n');
+
+    const replyPreview = t.reply.length > 200
+      ? t.reply.slice(0, 200) + '...'
+      : t.reply;
+
+    return {
+      text: [
+        `--- Last Turn (turn ${t.turnIndex}) ---`,
+        `Input:        ${t.input.role}: ${t.input.content}`,
+        `Model:        ${t.model}`,
+        `Tokens:       ${t.promptTokens} prompt / ${t.completionTokens} completion`,
+        `Tool calls (${t.toolCalls.length}):`,
+        toolLines,
+        `Reply:        ${replyPreview}`,
+        `Duration:     ${t.durationMs}ms`,
+      ].join('\n'),
+    };
+  },
 };
 
 /**

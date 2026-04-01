@@ -54,6 +54,29 @@ export const AgentSchema = z.object({
 
 export type Agent = z.infer<typeof AgentSchema>;
 
+// --- MCP server ---
+
+export const McpServerConfigSchema = z.object({
+  name: z.string(),
+  command: z.string(),
+  args: z.array(z.string()).optional(),
+  env: z.record(z.string()).optional(),
+});
+
+export type McpServerConfigZ = z.infer<typeof McpServerConfigSchema>;
+
+// --- Telegram channel ---
+
+export const TelegramConfigSchema = z.object({
+  enabled: z.boolean().default(false),
+  /** Bot token. Falls back to TELEGRAM_BOT_TOKEN env var when omitted. */
+  token: z.string().optional(),
+  allowed_users: z.array(z.number()).optional(),
+  allowed_groups: z.array(z.number()).optional(),
+});
+
+export type TelegramConfig = z.infer<typeof TelegramConfigSchema>;
+
 // --- Master config ---
 
 export const MasterConfigSchema = z.object({
@@ -72,6 +95,8 @@ export const MasterConfigSchema = z.object({
   prompt: z.object({
     max_tokens: z.number().default(8000),
   }).default({}),
+  mcp_servers: z.array(McpServerConfigSchema).default([]),
+  telegram: TelegramConfigSchema.default({}),
 });
 
 export type MasterConfig = z.infer<typeof MasterConfigSchema>;

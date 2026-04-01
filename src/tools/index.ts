@@ -23,3 +23,11 @@ export {
   type ApprovalResult,
   type ApprovalCallback,
 } from './approval.js';
+
+export {
+  type McpServerConfig,
+  type McpToolDefinition,
+  McpConnection,
+} from './mcp-client.js';
+
+export { loadMcpServers } from './mcp-loader.js';
