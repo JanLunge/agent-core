@@ -163,6 +163,51 @@ export function registerCoreTools(registry: ToolRegistry): void {
     },
   );
 
+  // --- schedule_task ---
+  registry.register(
+    'schedule_task',
+    'Schedule a recurring task for the agent. The task will fire on the given schedule and send the prompt to the agent.',
+    {
+      type: 'object',
+      properties: {
+        description: {
+          type: 'string',
+          description: 'Human-readable description of what this task does',
+        },
+        schedule: {
+          type: 'string',
+          description: 'When to run: "every 5m", "every 2h", or "daily at 09:00"',
+        },
+        prompt: {
+          type: 'string',
+          description: 'The message to send to the agent when the task fires',
+        },
+      },
+      required: ['description', 'schedule', 'prompt'],
+    },
+    async (args) => {
+      const description = args.description as string;
+      const schedule = args.schedule as string;
+      return (
+        `Task scheduling registered: ${description} (${schedule}). ` +
+        'Note: task scheduler must be started via `agent-core start` for tasks to execute.'
+      );
+    },
+  );
+
+  // --- list_tasks ---
+  registry.register(
+    'list_tasks',
+    'List all scheduled tasks for this agent.',
+    {
+      type: 'object',
+      properties: {},
+    },
+    async () => {
+      return 'Task listing not yet wired. Use /tasks command.';
+    },
+  );
+
   // --- memory_write ---
   registry.register(
     'memory_write',

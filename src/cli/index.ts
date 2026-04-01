@@ -17,6 +17,7 @@ import { TraceStore } from '../journal/trace.js';
 import { MemoryStore } from '../memory/store.js';
 import { TelegramConnector } from '../channel/telegram/connector.js';
 import { HeartbeatScheduler } from '../heartbeat/scheduler.js';
+import { createGateway } from '../gateway/server.js';
 
 const program = new Command();
 
@@ -114,9 +115,19 @@ program
   .option('-a, --agent <name>', 'Agent name (defaults to first found)')
   .option('-m, --model <model>', 'Override the model')
   .action(async (opts) => {
-    const { config, agentConfig, agent, router, cleanup } = await setupAgent(opts);
+    const { config, agentConfig, agent, router, traceStore, memoryStore, cleanup } = await setupAgent(opts);
 
     const shutdownHandlers: (() => void)[] = [cleanup];
+
+    // Start gateway server
+    const gateway = createGateway({
+      port: 3120,
+      router,
+      traceStore,
+      memoryStore,
+    });
+    await gateway.start();
+    shutdownHandlers.push(() => { gateway.stop(); });
 
     // Start Telegram if configured
     const telegramConfig = config.master.telegram;

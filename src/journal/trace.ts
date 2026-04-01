@@ -84,12 +84,16 @@ export class TraceStore {
     return rows.map(rowToTrace);
   }
 
+  getDb(): Database.Database {
+    return this.db;
+  }
+
   close(): void {
     this.db.close();
   }
 }
 
-interface TraceRow {
+export interface TraceRow {
   id: number;
   conversation_id: string;
   turn_index: number;
@@ -103,7 +107,7 @@ interface TraceRow {
   duration_ms: number;
 }
 
-function rowToTrace(row: TraceRow): TraceEntry {
+export function rowToTrace(row: TraceRow): TraceEntry {
   return {
     id: row.id,
     conversationId: row.conversation_id,

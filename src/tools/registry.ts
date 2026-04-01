@@ -40,6 +40,10 @@ export class ToolRegistry {
     return Array.from(this.tools.values()).map((entry) => entry.definition);
   }
 
+  remove(name: string): boolean {
+    return this.tools.delete(name);
+  }
+
   has(name: string): boolean {
     return this.tools.has(name);
   }

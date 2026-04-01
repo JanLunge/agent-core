@@ -13,6 +13,7 @@ export interface IncomingMessage {
 export interface Router {
   registerAgent(name: string, agent: AgentRuntime): void;
   getAgent(name: string): AgentRuntime | undefined;
+  listAgents(): Map<string, AgentRuntime>;
   route(
     message: IncomingMessage,
     onStream?: (chunk: StreamChunk) => void,
@@ -42,6 +43,10 @@ export function createRouter(): Router {
 
     getAgent(name: string): AgentRuntime | undefined {
       return agents.get(name);
+    },
+
+    listAgents(): Map<string, AgentRuntime> {
+      return new Map(agents);
     },
 
     async route(

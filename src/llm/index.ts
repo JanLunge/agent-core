@@ -23,3 +23,9 @@ export {
   parseToolCalls,
   type ParsedToolCall,
 } from './function-calling.js';
+
+export { RateLimiter, createRateLimitedProvider } from './rate-limit.js';
+
+export { CostTracker, createCostTrackingProvider } from './cost.js';
+
+export { createFailoverProvider } from './failover.js';

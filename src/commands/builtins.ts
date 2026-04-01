@@ -1,4 +1,5 @@
 import type { TraceStore, ToolCallEntry } from '../journal/trace.js';
+import type { SkillManifest } from '../skills/loader.js';
 
 export interface CommandContext {
   agentName: string;
@@ -6,6 +7,7 @@ export interface CommandContext {
   conversationId: string;
   status: string;
   traceStore?: TraceStore;
+  skills?: SkillManifest[];
 }
 
 export interface CommandResult {
@@ -22,6 +24,7 @@ const BUILTINS: Record<string, (args: string, ctx: CommandContext) => CommandRes
       '  /reset      — reset the conversation',
       '  /history    — show message count for this conversation',
       '  /debug      — show last turn trace (tokens, tools, duration)',
+      '  /skills     — list loaded skills',
     ].join('\n'),
   }),
 
@@ -50,6 +53,21 @@ const BUILTINS: Record<string, (args: string, ctx: CommandContext) => CommandRes
   history: (_args, ctx) => ({
     text: `Conversation ${ctx.conversationId} — use getHistory() for message details.`,
   }),
+
+  skills: (_args, ctx) => {
+    if (!ctx.skills || ctx.skills.length === 0) {
+      return { text: 'No skills loaded.' };
+    }
+
+    const lines = ctx.skills.map((s) => {
+      const status = s.enabled ? 'enabled' : 'disabled';
+      return `  ${s.name} — ${status}, ${s.tools.length} tool(s)`;
+    });
+
+    return {
+      text: ['Loaded skills:', ...lines].join('\n'),
+    };
+  },
 
   debug: (_args, ctx) => {
     if (!ctx.traceStore) {

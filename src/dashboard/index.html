@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agent Core Dashboard</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, monospace;
+    background: #0d1117;
+    color: #c9d1d9;
+    min-height: 100vh;
+  }
+  header {
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 12px 24px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+  header h1 { font-size: 16px; color: #58a6ff; font-weight: 600; }
+  .ws-status {
+    font-size: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .ws-dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #f85149;
+  }
+  .ws-dot.connected { background: #3fb950; }
+  .tabs {
+    display: flex;
+    background: #161b22;
+    border-bottom: 1px solid #30363d;
+    padding: 0 24px;
+  }
+  .tab {
+    padding: 10px 20px;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    color: #8b949e;
+    font-size: 13px;
+    font-weight: 500;
+    transition: color 0.15s;
+  }
+  .tab:hover { color: #c9d1d9; }
+  .tab.active { color: #58a6ff; border-bottom-color: #58a6ff; }
+  .content { padding: 24px; max-width: 1200px; margin: 0 auto; }
+  .panel { display: none; }
+  .panel.active { display: block; }
+  .card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    padding: 16px;
+    margin-bottom: 12px;
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: pointer;
+  }
+  .card-header h3 { font-size: 14px; color: #58a6ff; }
+  .card-header .meta { font-size: 12px; color: #8b949e; }
+  .card-body { margin-top: 12px; display: none; }
+  .card.expanded .card-body { display: block; }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge-idle { background: #1f6feb33; color: #58a6ff; }
+  .badge-running { background: #3fb95033; color: #3fb950; }
+  .badge-stopped { background: #f8514933; color: #f85149; }
+  input[type="text"] {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    padding: 8px 12px;
+    border-radius: 6px;
+    font-size: 13px;
+    width: 100%;
+    max-width: 400px;
+    margin-bottom: 16px;
+  }
+  input[type="text"]:focus { outline: none; border-color: #58a6ff; }
+  pre {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 4px;
+    padding: 12px;
+    overflow-x: auto;
+    font-size: 12px;
+    line-height: 1.5;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .tool-call {
+    background: #1c2128;
+    border-left: 3px solid #d29922;
+    padding: 8px 12px;
+    margin: 6px 0;
+    border-radius: 0 4px 4px 0;
+    font-size: 12px;
+  }
+  .tool-call .tool-name { color: #d29922; font-weight: 600; }
+  .tool-call .tool-duration { color: #8b949e; margin-left: 8px; }
+  .stat-row {
+    display: flex;
+    gap: 8px;
+    margin-top: 6px;
+    font-size: 12px;
+    color: #8b949e;
+  }
+  .stat-row span { color: #c9d1d9; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th, td {
+    text-align: left;
+    padding: 10px 12px;
+    border-bottom: 1px solid #21262d;
+  }
+  th { color: #8b949e; font-weight: 500; font-size: 12px; }
+  .empty {
+    text-align: center;
+    color: #484f58;
+    padding: 40px;
+    font-size: 14px;
+  }
+  .controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+  }
+  button {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    padding: 6px 14px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  button:hover { background: #30363d; }
+  .memory-entry {
+    border-left: 3px solid #58a6ff;
+    padding: 8px 12px;
+    margin: 6px 0;
+  }
+  .memory-key { color: #58a6ff; font-weight: 600; font-size: 13px; }
+  .memory-content { margin-top: 4px; font-size: 12px; }
+  .memory-meta { font-size: 11px; color: #484f58; margin-top: 4px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Agent Core Dashboard</h1>
+  <div class="ws-status">
+    <div class="ws-dot" id="wsDot"></div>
+    <span id="wsLabel">disconnected</span>
+  </div>
+</header>
+
+<div class="tabs">
+  <div class="tab active" data-panel="agents">Agents</div>
+  <div class="tab" data-panel="traces">Traces</div>
+  <div class="tab" data-panel="memory">Memory</div>
+  <div class="tab" data-panel="tools">Tools</div>
+</div>
+
+<div class="content">
+
+  <!-- Agents Panel -->
+  <div id="agents" class="panel active">
+    <div id="agentList"><div class="empty">Loading agents...</div></div>
+  </div>
+
+  <!-- Traces Panel -->
+  <div id="traces" class="panel">
+    <div class="controls">
+      <input type="text" id="convIdInput" placeholder="Conversation ID (e.g. cli:default)">
+      <button onclick="loadTraces()">Load Traces</button>
+    </div>
+    <div id="traceList"><div class="empty">Enter a conversation ID to view traces</div></div>
+  </div>
+
+  <!-- Memory Panel -->
+  <div id="memory" class="panel">
+    <div class="controls">
+      <input type="text" id="memAgentInput" placeholder="Agent name">
+      <input type="text" id="memQueryInput" placeholder="Search query (optional)">
+      <button onclick="loadMemory()">Search</button>
+    </div>
+    <div id="memoryList"><div class="empty">Enter an agent name to browse memories</div></div>
+  </div>
+
+  <!-- Tools Panel -->
+  <div id="tools" class="panel">
+    <div id="toolStats"><div class="empty">Loading tool stats...</div></div>
+  </div>
+
+</div>
+
+<script>
+const BASE = '';
+let ws = null;
+
+// --- Tabs ---
+document.querySelectorAll('.tab').forEach(tab => {
+  tab.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+    tab.classList.add('active');
+    document.getElementById(tab.dataset.panel).classList.add('active');
+  });
+});
+
+// --- WebSocket ---
+function connectWs() {
+  const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  ws = new WebSocket(`${proto}//${location.host}/ws`);
+  ws.onopen = () => {
+    document.getElementById('wsDot').classList.add('connected');
+    document.getElementById('wsLabel').textContent = 'connected';
+  };
+  ws.onclose = () => {
+    document.getElementById('wsDot').classList.remove('connected');
+    document.getElementById('wsLabel').textContent = 'disconnected';
+    setTimeout(connectWs, 3000);
+  };
+  ws.onmessage = (ev) => {
+    try {
+      const msg = JSON.parse(ev.data);
+      if (msg.type === 'trace') {
+        handleLiveTrace(msg.data);
+      }
+    } catch {}
+  };
+}
+connectWs();
+
+function handleLiveTrace(trace) {
+  // If we're viewing the same conversation, append the trace
+  const convId = document.getElementById('convIdInput').value.trim();
+  if (convId && trace.conversationId === convId) {
+    const container = document.getElementById('traceList');
+    const empty = container.querySelector('.empty');
+    if (empty) empty.remove();
+    container.insertBefore(renderTraceCard(trace), container.firstChild);
+  }
+}
+
+// --- Agents ---
+async function loadAgents() {
+  try {
+    const res = await fetch(`${BASE}/api/agents`);
+    const data = await res.json();
+    const container = document.getElementById('agentList');
+    if (!data.agents || data.agents.length === 0) {
+      container.innerHTML = '<div class="empty">No agents registered</div>';
+      return;
+    }
+    container.innerHTML = '';
+    for (const agent of data.agents) {
+      const card = document.createElement('div');
+      card.className = 'card';
+      card.innerHTML = `
+        <div class="card-header" onclick="toggleCard(this)">
+          <h3>${esc(agent.name)}</h3>
+          <span class="badge badge-${agent.status}">${agent.status}</span>
+        </div>
+        <div class="card-body">
+          <div class="stat-row">Model: <span>${esc(agent.model)}</span></div>
+          <div class="stat-row">Role: <span>${esc(agent.role)}</span></div>
+          <div style="margin-top:8px">
+            <button onclick="loadAgentDetail('${esc(agent.name)}', this)">Load details</button>
+          </div>
+          <div class="agent-detail"></div>
+        </div>
+      `;
+      container.appendChild(card);
+    }
+    // Auto-fill agent name in memory tab
+    if (data.agents.length > 0) {
+      document.getElementById('memAgentInput').value = data.agents[0].name;
+    }
+  } catch (err) {
+    document.getElementById('agentList').innerHTML = `<div class="empty">Error loading agents: ${esc(err.message)}</div>`;
+  }
+}
+
+async function loadAgentDetail(name, btn) {
+  const detail = btn.parentElement.nextElementSibling;
+  try {
+    const res = await fetch(`${BASE}/api/agents/${encodeURIComponent(name)}`);
+    const data = await res.json();
+    let toolsHtml = '';
+    if (data.tools && data.tools.length > 0) {
+      toolsHtml = '<table><th>Tool</th><th>Description</th>' +
+        data.tools.map(t => `<tr><td>${esc(t.name)}</td><td>${esc(t.description || '')}</td></tr>`).join('') +
+        '</table>';
+    }
+    detail.innerHTML = `
+      <div style="margin-top:12px">
+        <div class="stat-row">System prompt: <span>${esc((data.systemPrompt || '(none)'))}</span></div>
+        <div style="margin-top:8px"><strong style="font-size:12px;color:#8b949e">Tools (${data.tools?.length || 0})</strong></div>
+        ${toolsHtml}
+      </div>
+    `;
+  } catch (err) {
+    detail.innerHTML = `<div class="empty">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+// --- Traces ---
+async function loadTraces() {
+  const convId = document.getElementById('convIdInput').value.trim();
+  if (!convId) return;
+  const container = document.getElementById('traceList');
+  container.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    const res = await fetch(`${BASE}/api/conversations/${encodeURIComponent(convId)}/traces`);
+    const data = await res.json();
+    if (!data.traces || data.traces.length === 0) {
+      container.innerHTML = '<div class="empty">No traces found for this conversation</div>';
+      return;
+    }
+    container.innerHTML = '';
+    for (const trace of data.traces) {
+      container.appendChild(renderTraceCard(trace));
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="empty">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+function renderTraceCard(trace) {
+  const card = document.createElement('div');
+  card.className = 'card';
+  const toolsCount = trace.toolCalls?.length || 0;
+  const totalTokens = (trace.promptTokens || 0) + (trace.completionTokens || 0);
+  card.innerHTML = `
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>Turn ${trace.turnIndex}</h3>
+      <div class="meta">
+        ${totalTokens} tokens | ${trace.durationMs}ms | ${toolsCount} tool call${toolsCount !== 1 ? 's' : ''} | ${esc(trace.model)}
+      </div>
+    </div>
+    <div class="card-body">
+      <div style="margin-bottom:8px"><strong style="color:#8b949e;font-size:12px">Input</strong></div>
+      <pre>${esc(typeof trace.input === 'string' ? trace.input : (trace.input?.content || JSON.stringify(trace.input)))}</pre>
+      ${toolsCount > 0 ? `
+        <div style="margin:12px 0 8px"><strong style="color:#8b949e;font-size:12px">Tool Calls</strong></div>
+        ${trace.toolCalls.map(tc => `
+          <div class="tool-call">
+            <span class="tool-name">${esc(tc.name)}</span>
+            <span class="tool-duration">${tc.durationMs}ms</span>
+            ${tc.error ? `<span style="color:#f85149;margin-left:8px">${esc(tc.error)}</span>` : ''}
+            <pre style="margin-top:6px;border:none;padding:4px 0">${esc(JSON.stringify(tc.args, null, 2))}</pre>
+            <pre style="border:none;padding:4px 0;color:#8b949e;max-height:200px;overflow:auto">${esc(tc.result?.substring(0, 500) || '')}</pre>
+          </div>
+        `).join('')}
+      ` : ''}
+      <div style="margin:12px 0 8px"><strong style="color:#8b949e;font-size:12px">Reply</strong></div>
+      <pre>${esc(trace.reply)}</pre>
+      <div class="stat-row" style="margin-top:8px">
+        Prompt tokens: <span>${trace.promptTokens}</span> |
+        Completion tokens: <span>${trace.completionTokens}</span> |
+        Duration: <span>${trace.durationMs}ms</span> |
+        Time: <span>${esc(trace.timestamp)}</span>
+      </div>
+    </div>
+  `;
+  return card;
+}
+
+// --- Memory ---
+async function loadMemory() {
+  const agentName = document.getElementById('memAgentInput').value.trim();
+  if (!agentName) return;
+  const query = document.getElementById('memQueryInput').value.trim();
+  const container = document.getElementById('memoryList');
+  container.innerHTML = '<div class="empty">Loading...</div>';
+  try {
+    let url = `${BASE}/api/memory/${encodeURIComponent(agentName)}`;
+    if (query) url += `?query=${encodeURIComponent(query)}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (!data.memories || data.memories.length === 0) {
+      container.innerHTML = '<div class="empty">No memories found</div>';
+      return;
+    }
+    container.innerHTML = '';
+    for (const mem of data.memories) {
+      const el = document.createElement('div');
+      el.className = 'card';
+      el.innerHTML = `
+        <div class="memory-entry">
+          <div class="memory-key">${esc(mem.key)}</div>
+          <div class="memory-content">${esc(mem.content)}</div>
+          <div class="memory-meta">Updated: ${esc(mem.updated_at)} | Created: ${esc(mem.created_at)}</div>
+        </div>
+      `;
+      container.appendChild(el);
+    }
+  } catch (err) {
+    container.innerHTML = `<div class="empty">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+// --- Tools ---
+async function loadToolStats() {
+  try {
+    const res = await fetch(`${BASE}/api/tools/stats`);
+    const data = await res.json();
+    const container = document.getElementById('toolStats');
+    if (!data.stats || data.stats.length === 0) {
+      container.innerHTML = '<div class="empty">No tool stats available</div>';
+      return;
+    }
+    container.innerHTML = `
+      <table>
+        <tr><th>Tool</th><th>Calls</th><th>Avg Duration (ms)</th></tr>
+        ${data.stats.map(s => `<tr><td>${esc(s.name)}</td><td>${s.calls}</td><td>${s.avgDurationMs}</td></tr>`).join('')}
+      </table>
+    `;
+  } catch (err) {
+    document.getElementById('toolStats').innerHTML = `<div class="empty">Error: ${esc(err.message)}</div>`;
+  }
+}
+
+// --- Helpers ---
+function toggleCard(header) {
+  header.parentElement.classList.toggle('expanded');
+}
+
+function esc(str) {
+  if (str == null) return '';
+  const d = document.createElement('div');
+  d.textContent = String(str);
+  return d.innerHTML;
+}
+
+// --- Init ---
+loadAgents();
+loadToolStats();
+</script>
+</body>
+</html>

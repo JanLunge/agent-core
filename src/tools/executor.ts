@@ -1,8 +1,10 @@
 import type { ParsedToolCall } from '../llm/function-calling.js';
+import type { LLMProvider } from '../llm/types.js';
 import type { ToolContext } from './registry.js';
 import { ToolRegistry } from './registry.js';
 import type { ToolPolicy } from './policy.js';
 import type { ApprovalCallback } from './approval.js';
+import { compactToolResult } from './compaction.js';
 
 const MAX_RESULT_BYTES = 20 * 1024;
 
@@ -20,6 +22,10 @@ export interface ExecuteOptions {
   context: ToolContext;
   policy?: ToolPolicy;
   onApproval?: ApprovalCallback;
+  /** Optional LLM provider used for smart result compaction. */
+  compactionProvider?: LLMProvider;
+  /** Model to use for compaction summaries. */
+  compactionModel?: string;
 }
 
 function truncate(text: string): string {
@@ -34,7 +40,7 @@ export async function executeTool(
   call: ParsedToolCall,
   options: ExecuteOptions,
 ): Promise<ToolResult> {
-  const { registry, context, policy, onApproval } = options;
+  const { registry, context, policy, onApproval, compactionProvider, compactionModel } = options;
   const start = performance.now();
 
   if (call.parseError) {
@@ -81,7 +87,8 @@ export async function executeTool(
 
   try {
     const raw = await entry.handler(finalArgs, context);
-    return { toolCallId: call.id, name: call.name, result: truncate(raw), durationMs: performance.now() - start };
+    const compacted = await compactToolResult(raw, compactionProvider, compactionModel);
+    return { toolCallId: call.id, name: call.name, result: truncate(compacted), durationMs: performance.now() - start };
   } catch (err) {
     return { toolCallId: call.id, name: call.name, result: '', error: (err as Error).message, durationMs: performance.now() - start };
   }

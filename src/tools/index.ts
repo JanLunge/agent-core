@@ -15,6 +15,8 @@ export {
 export {
   type ToolDisposition,
   type ToolPolicy,
+  type ContextRule,
+  type ToolPolicyOptions,
   createToolPolicy,
 } from './policy.js';
 
@@ -23,6 +25,8 @@ export {
   type ApprovalResult,
   type ApprovalCallback,
 } from './approval.js';
+
+export { compactToolResult } from './compaction.js';
 
 export {
   type McpServerConfig,

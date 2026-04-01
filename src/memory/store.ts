@@ -1,4 +1,5 @@
 import Database from 'better-sqlite3';
+import * as sqliteVec from 'sqlite-vec';
 import { mkdirSync } from 'node:fs';
 import { join } from 'node:path';
 
@@ -13,11 +14,14 @@ export interface MemoryEntry {
 
 export class MemoryStore {
   private db: Database.Database;
+  readonly vectorDimensions: number;
 
-  constructor(dataDir: string) {
+  constructor(dataDir: string, vectorDimensions = 768) {
+    this.vectorDimensions = vectorDimensions;
     mkdirSync(dataDir, { recursive: true });
     this.db = new Database(join(dataDir, 'memory.db'));
     this.db.pragma('journal_mode = WAL');
+    sqliteVec.load(this.db);
     this.migrate();
   }
 
@@ -52,6 +56,13 @@ export class MemoryStore {
         INSERT INTO memories_fts(rowid, key, content)
         VALUES (new.id, new.key, new.content);
       END;
+    `);
+
+    this.db.exec(`
+      CREATE VIRTUAL TABLE IF NOT EXISTS memory_vectors USING vec0(
+        memory_id INTEGER PRIMARY KEY,
+        embedding float[${this.vectorDimensions}]
+      );
     `);
   }
 
@@ -104,6 +115,56 @@ export class MemoryStore {
       'DELETE FROM memories WHERE agent_name = ? AND key = ?',
     ).run(agentName, key);
     return result.changes > 0;
+  }
+
+  writeWithEmbedding(agentName: string, key: string, content: string, embedding: number[]): void {
+    this.write(agentName, key, content);
+
+    const row = this.db.prepare(
+      'SELECT id FROM memories WHERE agent_name = ? AND key = ?',
+    ).get(agentName, key) as { id: number };
+
+    const embeddingBuf = Buffer.from(new Float32Array(embedding).buffer);
+
+    // Upsert into vector table: delete existing then insert
+    this.db.prepare('DELETE FROM memory_vectors WHERE memory_id = ?').run(row.id);
+    this.db.prepare(
+      'INSERT INTO memory_vectors (memory_id, embedding) VALUES (?, ?)',
+    ).run(row.id, embeddingBuf);
+  }
+
+  semanticSearch(agentName: string, queryEmbedding: number[], limit = 10): MemoryEntry[] {
+    const embeddingBuf = Buffer.from(new Float32Array(queryEmbedding).buffer);
+
+    const rows = this.db.prepare(`
+      SELECT m.* FROM memories m
+      JOIN (
+        SELECT memory_id, distance FROM memory_vectors
+        WHERE embedding MATCH ? AND k = ?
+        ORDER BY distance
+      ) v ON v.memory_id = m.id
+      WHERE m.agent_name = ?
+    `).all(embeddingBuf, limit * 2, agentName) as MemoryEntry[];
+
+    return rows.slice(0, limit);
+  }
+
+  hybridSearch(agentName: string, query: string, queryEmbedding: number[], limit = 10): MemoryEntry[] {
+    const ftsResults = this.search(agentName, query, limit);
+    const vecResults = this.semanticSearch(agentName, queryEmbedding, limit);
+
+    // Merge and deduplicate by id, preserving order (FTS first, then vector)
+    const seen = new Set<number>();
+    const merged: MemoryEntry[] = [];
+
+    for (const entry of [...ftsResults, ...vecResults]) {
+      if (!seen.has(entry.id)) {
+        seen.add(entry.id);
+        merged.push(entry);
+      }
+    }
+
+    return merged.slice(0, limit);
   }
 
   close(): void {

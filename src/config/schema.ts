@@ -77,6 +77,18 @@ export const TelegramConfigSchema = z.object({
 
 export type TelegramConfig = z.infer<typeof TelegramConfigSchema>;
 
+// --- Embedding config ---
+
+export const EmbeddingConfigSchema = z.object({
+  provider: z.enum(['ollama', 'openai']).default('ollama'),
+  model: z.string().optional(),
+  base_url: z.string().optional(),
+  api_key_env: z.string().optional(),
+  dimensions: z.number().optional(),
+});
+
+export type EmbeddingConfig = z.infer<typeof EmbeddingConfigSchema>;
+
 // --- Master config ---
 
 export const MasterConfigSchema = z.object({
@@ -97,6 +109,7 @@ export const MasterConfigSchema = z.object({
   }).default({}),
   mcp_servers: z.array(McpServerConfigSchema).default([]),
   telegram: TelegramConfigSchema.default({}),
+  embeddings: EmbeddingConfigSchema.optional(),
 });
 
 export type MasterConfig = z.infer<typeof MasterConfigSchema>;
