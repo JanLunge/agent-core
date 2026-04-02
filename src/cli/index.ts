@@ -44,6 +44,18 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
     process.exit(1);
   }
 
+  // Warn about inline secrets
+  for (const p of config.master.providers) {
+    if (p.api_key) {
+      console.warn(`⚠ Provider "${p.name}" has an inline API key in config.yaml. Use api_key_env instead.`);
+      console.warn(`  Run \`agent-core setup\` to fix this.\n`);
+    }
+  }
+  if (config.master.telegram.token) {
+    console.warn('⚠ Telegram token is inline in config.yaml. Use TELEGRAM_BOT_TOKEN env var instead.');
+    console.warn('  Run `agent-core setup` to fix this.\n');
+  }
+
   initProviders(config.master.providers);
 
   const agentName = opts.agent ?? [...config.resolved.keys()][0];

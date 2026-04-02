@@ -38,6 +38,8 @@ export async function runSetup(baseDir: string): Promise<void> {
   });
 
   console.log('\n  Agent Core Setup\n');
+  console.log('  Secrets (API keys, tokens) are stored in environment');
+  console.log('  variables, never in config files.\n');
 
   // --- LLM Provider ---
   console.log('  -- LLM Provider --');
@@ -61,20 +63,26 @@ export async function runSetup(baseDir: string): Promise<void> {
       defaultModel = await ask(rl, 'Default model', 'local');
     }
 
-    const apiKey = await ask(rl, `API key (or press Enter to use env var ${apiKeyEnv || 'none'})`);
-
     const provider: Record<string, unknown> = {
       name: providerType,
       type: providerType === 'local' ? 'local' : 'openai-compatible',
     };
     if (baseUrl) provider.base_url = baseUrl;
-    if (apiKey) provider.api_key = apiKey;
-    else if (apiKeyEnv) provider.api_key_env = apiKeyEnv;
+    if (apiKeyEnv) provider.api_key_env = apiKeyEnv;
     if (defaultModel) provider.default_model = defaultModel;
 
     config.providers = [provider];
     config.default_provider = providerType;
     config.default_model = defaultModel;
+
+    if (apiKeyEnv) {
+      const current = process.env[apiKeyEnv];
+      if (current) {
+        console.log(`  ✓ ${apiKeyEnv} is already set in your environment`);
+      } else {
+        console.log(`\n  → Set your API key: export ${apiKeyEnv}="your-key-here"`);
+      }
+    }
   }
 
   // --- Telegram ---
@@ -82,14 +90,22 @@ export async function runSetup(baseDir: string): Promise<void> {
   const telegram = (config.telegram as Record<string, unknown>) || {};
   if (await askYesNo(rl, 'Enable Telegram bot?', false)) {
     telegram.enabled = true;
-    const token = await ask(rl, 'Bot token (from @BotFather, or Enter to use TELEGRAM_BOT_TOKEN env var)');
-    if (token) telegram.token = token;
+    // Never store token in config — always use env var
+    delete telegram.token;
 
     const userId = await ask(rl, 'Your Telegram user ID (from @userinfobot)');
     if (userId) {
       telegram.allowed_users = [parseInt(userId, 10)];
     }
     config.telegram = telegram;
+
+    const hasToken = process.env.TELEGRAM_BOT_TOKEN;
+    if (hasToken) {
+      console.log('  ✓ TELEGRAM_BOT_TOKEN is already set in your environment');
+    } else {
+      console.log('\n  → Set your bot token: export TELEGRAM_BOT_TOKEN="your-token"');
+      console.log('    (Get one from @BotFather on Telegram)');
+    }
   } else {
     telegram.enabled = false;
     config.telegram = telegram;
@@ -99,7 +115,9 @@ export async function runSetup(baseDir: string): Promise<void> {
   console.log('\n  -- Agent --');
   const agentsDir = join(baseDir, (config.agents_dir as string) || 'agents');
   const rolesDir = join(baseDir, (config.roles_dir as string) || 'roles');
-  const hasAgents = existsSync(agentsDir) && readFileSync(join(agentsDir, 'mira.yaml'), 'utf-8').length > 0;
+
+  const agentFile = join(agentsDir, 'mira.yaml');
+  const hasAgents = existsSync(agentFile);
 
   if (!hasAgents || await askYesNo(rl, 'Configure agent?', !hasAgents)) {
     const agentName = await ask(rl, 'Agent name', 'Mira');
@@ -121,16 +139,19 @@ export async function runSetup(baseDir: string): Promise<void> {
     // Write agent file
     const { mkdirSync } = await import('node:fs');
     mkdirSync(agentsDir, { recursive: true });
-    const agentFile = join(agentsDir, `${agentName.toLowerCase()}.yaml`);
+    const agentConfigFile = join(agentsDir, `${agentName.toLowerCase()}.yaml`);
     const agentConfig: Record<string, unknown> = {
       name: agentName,
       role: roleName,
       personality: './SOUL.md',
     };
     if (model) agentConfig.model = model;
-    writeFileSync(agentFile, stringifyYaml(agentConfig));
-    console.log(`  Created agent: ${agentFile}`);
+    writeFileSync(agentConfigFile, stringifyYaml(agentConfig));
+    console.log(`  Created agent: ${agentConfigFile}`);
   }
+
+  // --- Scrub any inline secrets that might already be in config ---
+  scrubSecrets(config);
 
   // --- Write config ---
   writeFileSync(configPath, stringifyYaml(config));
@@ -138,14 +159,50 @@ export async function runSetup(baseDir: string): Promise<void> {
 
   // --- Summary ---
   console.log('\n  Setup complete! Next steps:');
-  if ((config.telegram as Record<string, unknown>)?.enabled) {
-    const hasToken = (config.telegram as Record<string, unknown>)?.token;
-    if (!hasToken) {
-      console.log('    Set TELEGRAM_BOT_TOKEN in your environment');
+  const envVarsNeeded: string[] = [];
+  if ((config.telegram as Record<string, unknown>)?.enabled && !process.env.TELEGRAM_BOT_TOKEN) {
+    envVarsNeeded.push('TELEGRAM_BOT_TOKEN');
+  }
+  const providers = config.providers as Record<string, unknown>[] | undefined;
+  if (providers) {
+    for (const p of providers) {
+      const envVar = p.api_key_env as string;
+      if (envVar && !process.env[envVar]) envVarsNeeded.push(envVar);
     }
+  }
+  if (envVarsNeeded.length > 0) {
+    console.log(`    Set environment variables: ${envVarsNeeded.join(', ')}`);
   }
   console.log('    Run: npx tsx src/cli/index.ts start');
   console.log('    Chat: npx tsx src/cli/index.ts chat\n');
 
   rl.close();
+}
+
+/** Remove any inline secrets from config, replace with env var references. */
+function scrubSecrets(config: Record<string, unknown>): void {
+  // Scrub provider api_key → api_key_env
+  const providers = config.providers as Record<string, unknown>[] | undefined;
+  if (providers) {
+    for (const p of providers) {
+      if (p.api_key && typeof p.api_key === 'string') {
+        // Infer the env var name
+        const name = (p.name as string || 'default').toUpperCase().replace(/[^A-Z0-9]/g, '_');
+        if (!p.api_key_env) {
+          p.api_key_env = `${name}_API_KEY`;
+        }
+        console.log(`  ⚠ Moved inline API key for "${p.name}" to env var ${p.api_key_env}`);
+        console.log(`    → export ${p.api_key_env}="${p.api_key}"`);
+        delete p.api_key;
+      }
+    }
+  }
+
+  // Scrub telegram token
+  const telegram = config.telegram as Record<string, unknown> | undefined;
+  if (telegram?.token) {
+    console.log(`  ⚠ Moved inline Telegram token to env var TELEGRAM_BOT_TOKEN`);
+    console.log(`    → export TELEGRAM_BOT_TOKEN="${telegram.token}"`);
+    delete telegram.token;
+  }
 }
