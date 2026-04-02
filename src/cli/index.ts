@@ -78,7 +78,7 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
   }
 
   const toolPolicy = createToolPolicy({
-    auto: ['memory_search', 'memory_write'],
+    auto: ['memory_*'],
   });
 
   const agent = createAgent({ config: agentConfig, provider, store, registry, memoryStore, identityStore, toolPolicy, traceStore, baseDir });

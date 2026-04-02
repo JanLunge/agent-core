@@ -69,40 +69,24 @@ function buildMemorySection(brain: Brain, history: Message[]): PromptSection {
     return { name: 'memory', content: '', tokens: 0, priority: 90 };
   }
 
-  const seen = new Set<number>();
-  const allEntries: { key: string; content: string }[] = [];
-
-  // 1. Always include the most recent memories (general context about the user)
-  const recent = brain.memoryStore.getAll(brain.agentName, 10);
-  for (const r of recent) {
-    if (!seen.has(r.id)) {
-      seen.add(r.id);
-      allEntries.push({ key: r.key, content: r.content });
-    }
-  }
-
-  // 2. Search for memories relevant to recent conversation
+  // Search for memories relevant to recent conversation
   const recentUserMessages = history
     .filter((m) => m.role === 'user')
     .slice(-3)
     .map((m) => m.content);
 
-  if (recentUserMessages.length > 0) {
-    const query = recentUserMessages.join(' ');
-    const results = brain.search(query, 5);
-    for (const r of results) {
-      if (!seen.has(r.id)) {
-        seen.add(r.id);
-        allEntries.push({ key: r.key, content: r.content });
-      }
-    }
-  }
-
-  if (allEntries.length === 0) {
+  if (recentUserMessages.length === 0) {
     return { name: 'memory', content: '', tokens: 0, priority: 90 };
   }
 
-  const lines = allEntries.map((r) => `- [${r.key}]: ${r.content}`).join('\n');
+  const query = recentUserMessages.join(' ');
+  const results = brain.search(query, 8);
+
+  if (results.length === 0) {
+    return { name: 'memory', content: '', tokens: 0, priority: 90 };
+  }
+
+  const lines = results.map((r) => `- [${r.key}]: ${r.content}`).join('\n');
   const content = `Things you know (from your memory):\n${lines}`;
 
   return {

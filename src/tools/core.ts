@@ -211,13 +211,13 @@ export function registerCoreTools(registry: ToolRegistry): void {
   // --- memory_write ---
   registry.register(
     'memory_write',
-    "Write something to the agent's memory. Persists across conversations and restarts.",
+    "Save or update a memory. Writing to an existing key overwrites it. Use clear keys like 'user-name', 'current-project', 'preference-editor'.",
     {
       type: 'object',
       properties: {
         key: {
           type: 'string',
-          description: 'Short label for this memory',
+          description: 'Short unique key for this memory (e.g. "user-name", "project-goal"). Writing the same key updates it.',
         },
         content: {
           type: 'string',
@@ -232,6 +232,53 @@ export function registerCoreTools(registry: ToolRegistry): void {
       const content = args.content as string;
       context.brain.remember(key, content);
       return `Remembered "${key}".`;
+    },
+  );
+
+  // --- memory_delete ---
+  registry.register(
+    'memory_delete',
+    "Delete a memory by its key. Use when information is outdated or wrong.",
+    {
+      type: 'object',
+      properties: {
+        key: {
+          type: 'string',
+          description: 'The key of the memory to delete',
+        },
+      },
+      required: ['key'],
+    },
+    async (args, context) => {
+      if (!context.brain?.memoryStore) return 'Memory not available.';
+      const key = args.key as string;
+      const deleted = context.brain.memoryStore.delete(context.brain.agentName, key);
+      return deleted ? `Deleted memory "${key}".` : `No memory found with key "${key}".`;
+    },
+  );
+
+  // --- memory_list ---
+  registry.register(
+    'memory_list',
+    "List all saved memories. Shows keys and content summaries.",
+    {
+      type: 'object',
+      properties: {
+        limit: {
+          type: 'number',
+          description: 'Maximum number of memories to list (default 20)',
+        },
+      },
+    },
+    async (args, context) => {
+      if (!context.brain?.memoryStore) return 'Memory not available.';
+      const limit = (args.limit as number) ?? 20;
+      const entries = context.brain.memoryStore.getAll(context.brain.agentName, limit);
+      if (entries.length === 0) return 'No memories saved yet.';
+      return entries.map((r) => {
+        const preview = r.content.length > 120 ? r.content.slice(0, 120) + '...' : r.content;
+        return `[${r.key}]: ${preview}`;
+      }).join('\n');
     },
   );
 
