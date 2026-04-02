@@ -4,6 +4,8 @@ export interface Message {
   name?: string;
   tool_call_id?: string;
   tool_calls?: ToolCall[];
+  /** Internal timestamp (ISO string). Not sent to LLM API. */
+  timestamp?: string;
 }
 
 export interface ToolCall {

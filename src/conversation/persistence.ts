@@ -154,5 +154,6 @@ function rowToMessage(row: MessageRow): Message {
   if (row.name) message.name = row.name;
   if (row.tool_call_id) message.tool_call_id = row.tool_call_id;
   if (row.tool_calls) message.tool_calls = JSON.parse(row.tool_calls);
+  if (row.created_at) message.timestamp = row.created_at;
   return message;
 }

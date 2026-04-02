@@ -29,6 +29,18 @@ export interface AssembleOptions {
 
 const DEFAULT_MAX_TOKENS = 8000;
 
+/** Injects the current date/time so the agent has a sense of when things happen. */
+function buildTimeSection(): PromptSection {
+  const now = new Date();
+  const content = `Current time: ${now.toISOString()} (${now.toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}, ${now.toLocaleTimeString()})`;
+  return {
+    name: 'time',
+    content,
+    tokens: estimateTokens(content),
+    priority: 95,
+  };
+}
+
 /** Builds the identity section from brain's system prompt sections. */
 export function buildIdentitySection(brain: Brain): PromptSection {
   const content = brain.getSystemPromptSections().join('\n\n');
@@ -110,6 +122,7 @@ export function assemblePrompt(options: AssembleOptions): AssembledPrompt {
   // Build and sort sections by priority (highest first)
   const sections: PromptSection[] = [
     buildIdentitySection(brain),       // priority 100
+    buildTimeSection(),                // priority 95
     buildMemorySection(brain, history), // priority 90
     buildToolsSection(tools),          // priority 80
   ].sort((a, b) => b.priority - a.priority);
@@ -131,14 +144,21 @@ export function assemblePrompt(options: AssembleOptions): AssembledPrompt {
     .join('\n\n');
 
   // Trim history to fit history budget (keep most recent)
+  // Prefix user/assistant messages with timestamps so the agent has a sense of time
   const fittedMessages: Message[] = [];
   let historyTokens = 0;
 
   for (let i = history.length - 1; i >= 0; i--) {
     const msg = history[i];
-    const msgTokens = estimateTokens(msg.content);
+    let content = msg.content;
+    if (msg.timestamp && (msg.role === 'user' || msg.role === 'assistant')) {
+      const t = new Date(msg.timestamp);
+      const timeStr = t.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      content = `[${timeStr}] ${content}`;
+    }
+    const msgTokens = estimateTokens(content);
     if (historyTokens + msgTokens > budget.reserved.history) break;
-    fittedMessages.unshift(msg);
+    fittedMessages.unshift({ ...msg, content });
     historyTokens += msgTokens;
   }
 

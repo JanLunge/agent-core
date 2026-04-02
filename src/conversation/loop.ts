@@ -65,7 +65,7 @@ export async function runTurn(
   const turnStart = performance.now();
 
   // Record the user message
-  conversation.addMessage({ role: 'user', content: userMessage });
+  conversation.addMessage({ role: 'user', content: userMessage, timestamp: new Date().toISOString() });
 
   const tools = registry?.getDefinitions() ?? [];
   const allToolCalls: ParsedToolCall[] = [];
