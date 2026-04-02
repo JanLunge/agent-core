@@ -6,6 +6,7 @@ export interface ToolContext {
   baseDir: string;
   brain?: import('../memory/brain.js').Brain;
   identityStore?: import('../memory/identity-store.js').IdentityStore;
+  secretResolver?: import('../secrets/resolver.js').SecretResolver;
 }
 
 export type ToolHandler = (

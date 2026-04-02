@@ -164,15 +164,18 @@ export async function runTurn(
 
     const durationMs = performance.now() - turnStart;
 
-    // Record journal trace
+    // Record journal trace (redact secrets if resolver available)
     if (traceStore) {
+      const redact = toolContext?.secretResolver
+        ? (s: string) => toolContext.secretResolver!.redact(s)
+        : (s: string) => s;
       traceStore.record({
         conversationId: conversation.id,
         turnIndex: conversation.getHistory().filter((m) => m.role === 'user').length,
         timestamp: new Date().toISOString(),
-        input: { role: 'user', content: userMessage },
-        systemPrompt: capturedSystemPrompt,
-        messages: capturedMessages,
+        input: { role: 'user', content: redact(userMessage) },
+        systemPrompt: redact(capturedSystemPrompt),
+        messages: capturedMessages.map((m) => ({ ...m, content: redact(m.content) })),
         promptTokens: totalPromptTokens,
         completionTokens: totalCompletionTokens,
         model,

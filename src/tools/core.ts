@@ -82,12 +82,14 @@ export function registerCoreTools(registry: ToolRegistry): void {
       const command = args.command as string;
       const timeout = (args.timeout as number) ?? 30_000;
       try {
+        const env = context.secretResolver?.buildSanitizedEnv() ?? process.env;
         const output = execSync(command, {
           cwd: context.baseDir,
           timeout,
           encoding: 'utf-8',
           stdio: ['pipe', 'pipe', 'pipe'],
           maxBuffer: MAX_OUTPUT_BYTES,
+          env: env as NodeJS.ProcessEnv,
         });
         return truncate(output);
       } catch (err: unknown) {

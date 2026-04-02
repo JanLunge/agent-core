@@ -87,7 +87,9 @@ export async function executeTool(
 
   try {
     const raw = await entry.handler(finalArgs, context);
-    const compacted = await compactToolResult(raw, compactionProvider, compactionModel);
+    // Redact secrets BEFORE compaction so the compaction LLM never sees them
+    const redacted = context.secretResolver ? context.secretResolver.redact(raw) : raw;
+    const compacted = await compactToolResult(redacted, compactionProvider, compactionModel);
     return { toolCallId: call.id, name: call.name, result: truncate(compacted), durationMs: performance.now() - start };
   } catch (err) {
     return { toolCallId: call.id, name: call.name, result: '', error: (err as Error).message, durationMs: performance.now() - start };

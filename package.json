@@ -20,6 +20,7 @@
     "@fastify/static": "^9.0.0",
     "@fastify/websocket": "^11.2.0",
     "@types/react": "^19.2.14",
+    "age-encryption": "^0.3.0",
     "better-sqlite3": "^11.8.0",
     "chokidar": "^4.0.0",
     "commander": "^13.1.0",

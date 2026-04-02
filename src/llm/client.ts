@@ -1,17 +1,31 @@
 import type { ProviderProfile } from '../config/schema.js';
 import type { LLMProvider } from './types.js';
+import type { SecretResolver } from '../secrets/resolver.js';
 import { createOpenAIProvider } from './openai-provider.js';
 
 const providers = new Map<string, LLMProvider>();
 
-export function resolveApiKey(profile: ProviderProfile): string | undefined {
+export function resolveApiKey(profile: ProviderProfile, resolver?: SecretResolver): string | undefined {
   if (profile.api_key) return profile.api_key;
+  // Try vault first (label = env var name or provider_name_api_key)
+  if (resolver) {
+    const label = profile.api_key_env ?? `${profile.name}_api_key`;
+    const fromVault = resolver.resolve(label, 'llm-provider');
+    if (fromVault) return fromVault;
+  }
+  // Fall back to env var
   if (profile.api_key_env) return process.env[profile.api_key_env];
   return undefined;
 }
 
-export function createProvider(profile: ProviderProfile): LLMProvider {
-  const apiKey = resolveApiKey(profile);
+let activeResolver: SecretResolver | undefined;
+
+export function setSecretResolver(resolver: SecretResolver): void {
+  activeResolver = resolver;
+}
+
+export function createProvider(profile: ProviderProfile, resolver?: SecretResolver): LLMProvider {
+  const apiKey = resolveApiKey(profile, resolver ?? activeResolver);
 
   switch (profile.type) {
     case 'openai-compatible':

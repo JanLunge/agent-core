@@ -2,8 +2,10 @@
 
 import { Command } from 'commander';
 import { resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import * as readline from 'node:readline';
 import { loadConfig } from '../config/loader.js';
-import { createProvider, initProviders } from '../llm/client.js';
+import { createProvider, initProviders, setSecretResolver } from '../llm/client.js';
 import { createAgent } from '../agent/agent.js';
 import { ConversationStore } from '../conversation/persistence.js';
 import { createRouter } from '../router/router.js';
@@ -20,6 +22,10 @@ import { HeartbeatScheduler } from '../heartbeat/scheduler.js';
 import { createGateway } from '../gateway/server.js';
 import { startWsChat } from '../tui/ws-client.js';
 import { runSetup } from './setup.js';
+import { getMasterKey } from '../secrets/keychain.js';
+import { Vault } from '../secrets/vault.js';
+import { AuditLog } from '../secrets/audit.js';
+import { SecretResolver } from '../secrets/resolver.js';
 
 const program = new Command();
 
@@ -56,6 +62,18 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
     console.warn('  Run `agent-core setup` to fix this.\n');
   }
 
+  // Initialize secret resolver (vault + audit)
+  const dataDir = resolve(baseDir, config.master.data_dir);
+  const masterKey = getMasterKey();
+  let secretResolver: SecretResolver | undefined;
+  if (masterKey) {
+    const vault = new Vault(resolve(dataDir, 'vault.age'), masterKey);
+    await vault.load();
+    const audit = new AuditLog(dataDir);
+    secretResolver = new SecretResolver(vault, audit);
+    setSecretResolver(secretResolver);
+  }
+
   initProviders(config.master.providers);
 
   const agentName = opts.agent ?? [...config.resolved.keys()][0];
@@ -68,7 +86,6 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
   if (opts.model) agentConfig.model = opts.model;
 
   const provider = resolveProvider(config, agentConfig.provider);
-  const dataDir = resolve(baseDir, config.master.data_dir);
   const store = new ConversationStore(dataDir);
   const traceStore = new TraceStore(dataDir);
   const memoryStore = new MemoryStore(dataDir);
@@ -94,7 +111,7 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
     auto: ['memory_*'],
   });
 
-  const agent = createAgent({ config: agentConfig, provider, store, registry, memoryStore, identityStore, toolPolicy, traceStore, baseDir });
+  const agent = createAgent({ config: agentConfig, provider, store, registry, memoryStore, identityStore, secretResolver, toolPolicy, traceStore, baseDir });
   const router = createRouter();
   router.registerAgent(agentConfig.name, agent);
   router.setDefaultAgent(agentConfig.name);
@@ -108,7 +125,7 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
     for (const conn of mcpConnections) conn.close();
   };
 
-  return { config, agentConfig, agent, router, registry, traceStore, store, memoryStore, mcpConnections, baseDir, cleanup };
+  return { config, agentConfig, agent, router, registry, traceStore, store, memoryStore, secretResolver, mcpConnections, baseDir, cleanup };
 }
 
 program
@@ -132,7 +149,7 @@ program
   .option('-a, --agent <name>', 'Agent name (defaults to first found)')
   .option('-m, --model <model>', 'Override the model')
   .action(async (opts) => {
-    const { config, agentConfig, agent, router, traceStore, memoryStore, store, baseDir, cleanup } = await setupAgent(opts);
+    const { config, agentConfig, agent, router, traceStore, memoryStore, store, secretResolver, baseDir, cleanup } = await setupAgent(opts);
 
     const shutdownHandlers: (() => void)[] = [cleanup];
 
@@ -149,7 +166,9 @@ program
 
     // Start Telegram if configured
     const telegramConfig = config.master.telegram;
-    const telegramToken = telegramConfig.token ?? process.env.TELEGRAM_BOT_TOKEN;
+    const telegramToken = secretResolver?.resolve('TELEGRAM_BOT_TOKEN', 'telegram')
+      ?? telegramConfig.token
+      ?? process.env.TELEGRAM_BOT_TOKEN;
     if (telegramConfig.enabled && telegramToken) {
       const telegram = new TelegramConnector({
         token: telegramToken,
@@ -230,6 +249,139 @@ program
   .option('-d, --dir <path>', 'Base directory', '.')
   .action(async (opts) => {
     await runSetup(resolve(opts.dir));
+  });
+
+const secrets = program.command('secrets').description('Manage encrypted secrets vault');
+
+secrets
+  .command('add <label>')
+  .description('Add a secret to the vault')
+  .option('-d, --dir <path>', 'Base directory', '.')
+  .action(async (label: string, opts: { dir: string }) => {
+    const baseDir = resolve(opts.dir);
+    const config = loadConfig(baseDir);
+    const dataDir = resolve(baseDir, config.master.data_dir);
+
+    const masterKey = getMasterKey();
+    if (!masterKey) {
+      console.error('No master key found. Set AGENT_CORE_MASTER_KEY env var or store in macOS Keychain.');
+      process.exit(1);
+    }
+
+    const vault = new Vault(resolve(dataDir, 'vault.age'), masterKey);
+    await vault.load();
+
+    const rl = readline.createInterface({ input: process.stdin, output: process.stdout, terminal: true });
+    const value = await new Promise<string>((res) => {
+      rl.question(`  Enter value for "${label}": `, (v) => { rl.close(); res(v.trim()); });
+    });
+
+    if (!value) { console.error('No value provided.'); process.exit(1); }
+
+    vault.set(label, value);
+    await vault.save();
+
+    const audit = new AuditLog(dataDir);
+    audit.log({ action: 'add', label, granted: true });
+
+    console.log(`Secret "${label}" added to vault.`);
+  });
+
+secrets
+  .command('list')
+  .description('List secret labels (values are never shown)')
+  .option('-d, --dir <path>', 'Base directory', '.')
+  .action(async (opts: { dir: string }) => {
+    const baseDir = resolve(opts.dir);
+    const config = loadConfig(baseDir);
+    const dataDir = resolve(baseDir, config.master.data_dir);
+
+    const masterKey = getMasterKey();
+    if (!masterKey) {
+      console.error('No master key found. Set AGENT_CORE_MASTER_KEY env var.');
+      process.exit(1);
+    }
+
+    const vault = new Vault(resolve(dataDir, 'vault.age'), masterKey);
+    await vault.load();
+
+    const labels = vault.list();
+    if (labels.length === 0) {
+      console.log('Vault is empty.');
+    } else {
+      console.log(`Secrets (${labels.length}):`);
+      for (const l of labels) console.log(`  ${l}`);
+    }
+  });
+
+secrets
+  .command('remove <label>')
+  .description('Remove a secret from the vault')
+  .option('-d, --dir <path>', 'Base directory', '.')
+  .action(async (label: string, opts: { dir: string }) => {
+    const baseDir = resolve(opts.dir);
+    const config = loadConfig(baseDir);
+    const dataDir = resolve(baseDir, config.master.data_dir);
+
+    const masterKey = getMasterKey();
+    if (!masterKey) { console.error('No master key found.'); process.exit(1); }
+
+    const vault = new Vault(resolve(dataDir, 'vault.age'), masterKey);
+    await vault.load();
+
+    if (vault.delete(label)) {
+      await vault.save();
+      const audit = new AuditLog(dataDir);
+      audit.log({ action: 'remove', label, granted: true });
+      console.log(`Secret "${label}" removed.`);
+    } else {
+      console.log(`Secret "${label}" not found.`);
+    }
+  });
+
+secrets
+  .command('migrate')
+  .description('Import secrets from environment variables into the vault')
+  .option('-d, --dir <path>', 'Base directory', '.')
+  .action(async (opts: { dir: string }) => {
+    const baseDir = resolve(opts.dir);
+    const config = loadConfig(baseDir);
+    const dataDir = resolve(baseDir, config.master.data_dir);
+
+    const masterKey = getMasterKey();
+    if (!masterKey) { console.error('No master key found. Set AGENT_CORE_MASTER_KEY env var.'); process.exit(1); }
+
+    const vault = new Vault(resolve(dataDir, 'vault.age'), masterKey);
+    await vault.load();
+    const audit = new AuditLog(dataDir);
+
+    let imported = 0;
+
+    // Import provider API keys
+    for (const p of config.master.providers) {
+      if (p.api_key_env && process.env[p.api_key_env]) {
+        vault.set(p.api_key_env, process.env[p.api_key_env]!);
+        audit.log({ action: 'add', label: p.api_key_env, scope: 'migrate', granted: true });
+        console.log(`  Imported ${p.api_key_env}`);
+        imported++;
+      }
+    }
+
+    // Import Telegram token
+    if (process.env.TELEGRAM_BOT_TOKEN) {
+      vault.set('TELEGRAM_BOT_TOKEN', process.env.TELEGRAM_BOT_TOKEN);
+      audit.log({ action: 'add', label: 'TELEGRAM_BOT_TOKEN', scope: 'migrate', granted: true });
+      console.log('  Imported TELEGRAM_BOT_TOKEN');
+      imported++;
+    }
+
+    if (imported > 0) {
+      await vault.save();
+      console.log(`\nMigrated ${imported} secret(s) to vault.`);
+      console.log('You can now remove these env vars from your shell. Only AGENT_CORE_MASTER_KEY is needed.');
+    } else {
+      console.log('No secrets found in environment to migrate.');
+    }
   });
 
 function resolveProvider(config: ReturnType<typeof loadConfig>, providerName: string) {

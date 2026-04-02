@@ -10,6 +10,7 @@ import { ToolRegistry, type ToolContext } from '../tools/registry.js';
 import type { ToolPolicy } from '../tools/policy.js';
 import type { ApprovalCallback } from '../tools/approval.js';
 import type { TraceStore } from '../journal/trace.js';
+import type { SecretResolver } from '../secrets/resolver.js';
 
 export type AgentStatus = 'idle' | 'running' | 'stopped';
 
@@ -36,13 +37,14 @@ export interface CreateAgentOptions {
   registry: ToolRegistry;
   memoryStore?: MemoryStore;
   identityStore?: IdentityStore;
+  secretResolver?: SecretResolver;
   toolPolicy?: ToolPolicy;
   traceStore?: TraceStore;
   baseDir: string;
 }
 
 export function createAgent(options: CreateAgentOptions): AgentRuntime {
-  const { config, provider, store, registry, memoryStore, identityStore, toolPolicy, traceStore, baseDir } = options;
+  const { config, provider, store, registry, memoryStore, identityStore, secretResolver, toolPolicy, traceStore, baseDir } = options;
   const brain = createBrain(config, baseDir, memoryStore);
   let status: AgentStatus = 'idle';
 
@@ -80,6 +82,7 @@ export function createAgent(options: CreateAgentOptions): AgentRuntime {
           baseDir,
           brain,
           identityStore,
+          secretResolver,
         };
         const loopOptions: LoopOptions = {
           conversation,
