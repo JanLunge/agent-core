@@ -162,6 +162,33 @@
   .memory-key { color: #58a6ff; font-weight: 600; font-size: 13px; }
   .memory-content { margin-top: 4px; font-size: 12px; }
   .memory-meta { font-size: 11px; color: #484f58; margin-top: 4px; }
+  .conv-picker { display: flex; gap: 16px; margin-bottom: 16px; }
+  .conv-list {
+    flex: 0 0 320px;
+    max-height: 70vh;
+    overflow-y: auto;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    background: #161b22;
+  }
+  .conv-item {
+    padding: 10px 14px;
+    cursor: pointer;
+    border-bottom: 1px solid #21262d;
+    transition: background 0.1s;
+  }
+  .conv-item:last-child { border-bottom: none; }
+  .conv-item:hover { background: #1c2128; }
+  .conv-item.selected { background: #1f6feb22; border-left: 3px solid #58a6ff; }
+  .conv-item-agent { font-size: 13px; font-weight: 600; color: #c9d1d9; }
+  .conv-item-meta { font-size: 11px; color: #8b949e; margin-top: 2px; }
+  .conv-item-excerpt {
+    font-size: 12px; color: #6e7681; margin-top: 4px;
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  }
+  .conv-item-time { font-size: 11px; color: #484f58; margin-top: 2px; }
+  .conv-item .badge { margin-left: 6px; font-size: 10px; }
+  .trace-area { flex: 1; min-width: 0; }
 </style>
 </head>
 <body>
@@ -190,13 +217,14 @@
 
   <!-- Traces Panel -->
   <div id="traces" class="panel">
-    <div class="controls">
-      <select id="convSelect" onchange="loadTraces()">
-        <option value="">Select a conversation...</option>
-      </select>
-      <button onclick="loadConversations()">Refresh</button>
+    <div class="conv-picker">
+      <div class="conv-list" id="convList">
+        <div class="empty" style="padding:20px">Loading conversations...</div>
+      </div>
+      <div class="trace-area">
+        <div id="traceList"><div class="empty">Select a conversation</div></div>
+      </div>
     </div>
-    <div id="traceList"><div class="empty">Select a conversation to view traces</div></div>
   </div>
 
   <!-- Memory Panel -->
@@ -254,9 +282,10 @@ function connectWs() {
 }
 connectWs();
 
+let selectedConvId = '';
+
 function handleLiveTrace(trace) {
-  const convId = document.getElementById('convSelect').value;
-  if (convId && trace.conversationId === convId) {
+  if (selectedConvId && trace.conversationId === selectedConvId) {
     const container = document.getElementById('traceList');
     const empty = container.querySelector('.empty');
     if (empty) empty.remove();
@@ -327,42 +356,54 @@ async function loadAgentDetail(name, btn) {
 }
 
 // --- Conversations + Traces ---
+function selectConversation(id) {
+  selectedConvId = id;
+  document.querySelectorAll('.conv-item').forEach(el => {
+    el.classList.toggle('selected', el.dataset.id === id);
+  });
+  loadTraces();
+}
+
 async function loadConversations() {
+  const container = document.getElementById('convList');
   try {
     const res = await fetch(`${BASE}/api/conversations`);
     const data = await res.json();
-    const select = document.getElementById('convSelect');
-    const current = select.value;
-    select.innerHTML = '<option value="">Select a conversation...</option>';
-    // Sort by last message time (most recent first)
     const convos = (data.conversations || []).sort((a, b) =>
       (b.lastMessageAt || b.updatedAt || '').localeCompare(a.lastMessageAt || a.updatedAt || '')
     );
+    if (convos.length === 0) {
+      container.innerHTML = '<div class="empty" style="padding:20px">No conversations yet</div>';
+      return;
+    }
+    container.innerHTML = '';
     for (const c of convos) {
       const time = c.lastMessageAt || c.updatedAt || '';
-      const timeShort = time ? new Date(time + 'Z').toLocaleString() : '';
-      const excerpt = c.lastMessageExcerpt
-        ? ` — "${c.lastMessageExcerpt.slice(0, 50)}${c.lastMessageExcerpt.length > 50 ? '…' : ''}"`
-        : '';
-      const label = `${c.agentName} · ${c.messageCount} msgs · ${timeShort}${excerpt}`;
-      const opt = document.createElement('option');
-      opt.value = c.id;
-      opt.textContent = label;
-      select.appendChild(opt);
+      const timeStr = time ? new Date(time + 'Z').toLocaleString() : '';
+      const excerpt = c.lastMessageExcerpt || '';
+      const el = document.createElement('div');
+      el.className = 'conv-item' + (c.id === selectedConvId ? ' selected' : '');
+      el.dataset.id = c.id;
+      el.onclick = () => selectConversation(c.id);
+      el.innerHTML = `
+        <div class="conv-item-agent">${esc(c.agentName)}<span class="badge badge-${c.status === 'active' ? 'idle' : 'stopped'}">${esc(c.status)}</span></div>
+        <div class="conv-item-meta">${c.messageCount} messages · ${esc(c.channelId)}</div>
+        ${excerpt ? `<div class="conv-item-excerpt">${esc(excerpt)}</div>` : ''}
+        <div class="conv-item-time">${esc(timeStr)}</div>
+      `;
+      container.appendChild(el);
     }
-    if (current) select.value = current;
-    // Auto-select the most recent if nothing selected
-    if (!select.value && data.conversations?.length > 0) {
-      select.value = data.conversations[0].id;
-      loadTraces();
+    // Auto-select most recent if nothing selected
+    if (!selectedConvId && convos.length > 0) {
+      selectConversation(convos[0].id);
     }
   } catch (err) {
-    console.error('Failed to load conversations:', err);
+    container.innerHTML = `<div class="empty" style="padding:20px">Error: ${esc(err.message)}</div>`;
   }
 }
 
 async function loadTraces() {
-  const convId = document.getElementById('convSelect').value;
+  const convId = selectedConvId;
   if (!convId) return;
   const container = document.getElementById('traceList');
   container.innerHTML = '<div class="empty">Loading...</div>';
