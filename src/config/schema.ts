@@ -107,6 +107,16 @@ export const MasterConfigSchema = z.object({
   prompt: z.object({
     max_tokens: z.number().default(8000),
   }).default({}),
+  heartbeat: z.object({
+    enabled: z.boolean().default(true),
+    interval_minutes: z.number().default(60),
+    quiet_hours_start: z.number().optional(),
+    quiet_hours_end: z.number().optional(),
+    /** Path to a file containing the heartbeat prompt. Loaded each tick. */
+    prompt_file: z.string().optional(),
+    /** Inline prompt (used if prompt_file not set). */
+    prompt: z.string().optional(),
+  }).default({}),
   mcp_servers: z.array(McpServerConfigSchema).default([]),
   telegram: TelegramConfigSchema.default({}),
   embeddings: EmbeddingConfigSchema.optional(),

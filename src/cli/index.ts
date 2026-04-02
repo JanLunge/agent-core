@@ -120,7 +120,7 @@ program
   .option('-a, --agent <name>', 'Agent name (defaults to first found)')
   .option('-m, --model <model>', 'Override the model')
   .action(async (opts) => {
-    const { config, agentConfig, agent, router, traceStore, memoryStore, store, cleanup } = await setupAgent(opts);
+    const { config, agentConfig, agent, router, traceStore, memoryStore, store, baseDir, cleanup } = await setupAgent(opts);
 
     const shutdownHandlers: (() => void)[] = [cleanup];
 
@@ -150,15 +150,24 @@ program
       shutdownHandlers.push(() => telegram.stop());
     }
 
-    // Start heartbeat if configured
-    // TODO: make heartbeat configurable from config.yaml
-    const heartbeat = new HeartbeatScheduler({
-      config: { intervalMinutes: 60 },
-      agent,
-      channelId: 'heartbeat',
-    });
-    heartbeat.start();
-    shutdownHandlers.push(() => heartbeat.stop());
+    // Start heartbeat
+    const hbConfig = config.master.heartbeat;
+    if (hbConfig.enabled) {
+      const heartbeat = new HeartbeatScheduler({
+        config: {
+          intervalMinutes: hbConfig.interval_minutes,
+          quietHoursStart: hbConfig.quiet_hours_start,
+          quietHoursEnd: hbConfig.quiet_hours_end,
+          promptFile: hbConfig.prompt_file,
+          prompt: hbConfig.prompt,
+          baseDir,
+        },
+        agent,
+        channelId: 'heartbeat',
+      });
+      heartbeat.start();
+      shutdownHandlers.push(() => heartbeat.stop());
+    }
 
     console.log(`\n${agentConfig.name} is running (model: ${agentConfig.model})`);
     console.log('Press Ctrl+C to stop.\n');

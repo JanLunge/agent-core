@@ -1,0 +1,33 @@
+data_dir: ./data
+roles_dir: ./roles
+agents_dir: ./agents
+
+logging:
+  level: info
+
+history:
+  max_turns: 100
+
+prompt:
+  max_tokens: 8000
+
+# providers:
+#   - name: openrouter
+#     type: openai-compatible
+#     base_url: https://openrouter.ai/api/v1
+#     api_key_env: OPENROUTER_API_KEY
+#     default_model: qwen/qwen3.6-plus-preview:free
+# default_provider: openrouter
+# default_model: qwen/qwen3.6-plus-preview:free
+
+heartbeat:
+  enabled: true
+  interval_minutes: 60
+  quiet_hours_start: 23
+  quiet_hours_end: 7
+  prompt_file: ./HEARTBEAT.md
+
+# telegram:
+#   enabled: true
+#   token: "your-bot-token"  # or set TELEGRAM_BOT_TOKEN env var
+#   allowed_users: [YOUR_USER_ID]
