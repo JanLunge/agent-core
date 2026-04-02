@@ -10,12 +10,20 @@ export interface ToolCallEntry {
   error?: string;
 }
 
+export interface TraceMessage {
+  role: string;
+  content: string;
+  timestamp?: string;
+}
+
 export interface TraceEntry {
   id: number;
   conversationId: string;
   turnIndex: number;
   timestamp: string;
   input: { role: string; content: string };
+  systemPrompt: string;
+  messages: TraceMessage[];
   promptTokens: number;
   completionTokens: number;
   model: string;
@@ -50,20 +58,33 @@ export class TraceStore {
         duration_ms INTEGER NOT NULL
       );
     `);
+
+    // Migration: add system_prompt and messages columns if missing
+    const columns = this.db.prepare("PRAGMA table_info(traces)").all() as { name: string }[];
+    const colNames = new Set(columns.map((c) => c.name));
+    if (!colNames.has('system_prompt')) {
+      this.db.exec("ALTER TABLE traces ADD COLUMN system_prompt TEXT NOT NULL DEFAULT ''");
+    }
+    if (!colNames.has('messages')) {
+      this.db.exec("ALTER TABLE traces ADD COLUMN messages TEXT NOT NULL DEFAULT '[]'");
+    }
   }
 
   record(entry: Omit<TraceEntry, 'id'>): void {
     this.db.prepare(
       `INSERT INTO traces (
         conversation_id, turn_index, timestamp, input,
+        system_prompt, messages,
         prompt_tokens, completion_tokens, model,
         tool_calls, reply, duration_ms
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       entry.conversationId,
       entry.turnIndex,
       entry.timestamp,
       JSON.stringify(entry.input),
+      entry.systemPrompt,
+      JSON.stringify(entry.messages),
       entry.promptTokens,
       entry.completionTokens,
       entry.model,
@@ -99,6 +120,8 @@ export interface TraceRow {
   turn_index: number;
   timestamp: string;
   input: string;
+  system_prompt: string;
+  messages: string;
   prompt_tokens: number;
   completion_tokens: number;
   model: string;
@@ -114,6 +137,8 @@ export function rowToTrace(row: TraceRow): TraceEntry {
     turnIndex: row.turn_index,
     timestamp: row.timestamp,
     input: JSON.parse(row.input),
+    systemPrompt: row.system_prompt || '',
+    messages: row.messages ? JSON.parse(row.messages) : [],
     promptTokens: row.prompt_tokens,
     completionTokens: row.completion_tokens,
     model: row.model,

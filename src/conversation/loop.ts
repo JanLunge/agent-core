@@ -72,10 +72,22 @@ export async function runTurn(
   const allToolResults: ToolResult[] = [];
   let totalPromptTokens = 0;
   let totalCompletionTokens = 0;
+  let capturedSystemPrompt = '';
+  let capturedMessages: { role: string; content: string; timestamp?: string }[] = [];
 
   for (let i = 0; i < maxIterations; i++) {
     const history = conversation.getHistory();
     const assembled = assemblePrompt({ brain, history, tools: tools.length > 0 ? tools : undefined });
+
+    // Capture the full prompt from the first iteration for the trace
+    if (i === 0) {
+      capturedSystemPrompt = assembled.systemMessage;
+      capturedMessages = assembled.messages.map((m) => ({
+        role: m.role,
+        content: m.content,
+        timestamp: m.timestamp,
+      }));
+    }
 
     const messages: Message[] = [];
     if (assembled.systemMessage) {
@@ -159,6 +171,8 @@ export async function runTurn(
         turnIndex: conversation.getHistory().filter((m) => m.role === 'user').length,
         timestamp: new Date().toISOString(),
         input: { role: 'user', content: userMessage },
+        systemPrompt: capturedSystemPrompt,
+        messages: capturedMessages,
         promptTokens: totalPromptTokens,
         completionTokens: totalCompletionTokens,
         model,

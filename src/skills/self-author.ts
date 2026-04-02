@@ -49,6 +49,8 @@ export function reviewAndSuggestTools(
     toolCalls: JSON.parse(r.tool_calls) as ToolCallEntry[],
     reply: r.reply,
     durationMs: r.duration_ms,
+    systemPrompt: '',
+    messages: [],
   }));
 
   const suggestions: ToolSuggestion[] = [];

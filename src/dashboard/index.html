@@ -162,6 +162,31 @@
   .memory-key { color: #58a6ff; font-weight: 600; font-size: 13px; }
   .memory-content { margin-top: 4px; font-size: 12px; }
   .memory-meta { font-size: 11px; color: #484f58; margin-top: 4px; }
+  .trace-section { margin-bottom: 12px; }
+  .trace-section-header {
+    display: flex; align-items: center; gap: 6px;
+    font-size: 12px; color: #8b949e; font-weight: 500;
+    cursor: pointer; user-select: none; padding: 4px 0;
+  }
+  .trace-section-header:hover { color: #c9d1d9; }
+  .trace-section-header .arrow { transition: transform 0.15s; display: inline-block; }
+  .trace-section-header.open .arrow { transform: rotate(90deg); }
+  .trace-section-body { display: none; margin-top: 6px; }
+  .trace-section-header.open + .trace-section-body { display: block; }
+  .chat-bubble {
+    padding: 8px 12px; margin: 4px 0; border-radius: 8px;
+    font-size: 13px; line-height: 1.5; white-space: pre-wrap; word-break: break-word;
+  }
+  .chat-bubble.user { background: #1f6feb22; border-left: 3px solid #58a6ff; }
+  .chat-bubble.assistant { background: #1c2128; border-left: 3px solid #3fb950; }
+  .chat-bubble.system { background: #1c2128; border-left: 3px solid #8b949e; }
+  .chat-bubble.tool { background: #1c2128; border-left: 3px solid #d29922; font-size: 12px; }
+  .chat-role { font-size: 11px; font-weight: 600; margin-bottom: 2px; }
+  .chat-role.user { color: #58a6ff; }
+  .chat-role.assistant { color: #3fb950; }
+  .chat-role.system { color: #8b949e; }
+  .chat-role.tool { color: #d29922; }
+  .chat-time { font-size: 10px; color: #484f58; margin-left: 8px; }
   .conv-picker { display: flex; gap: 16px; margin-bottom: 16px; }
   .conv-list {
     flex: 0 0 320px;
@@ -425,21 +450,40 @@ async function loadTraces() {
 
 function renderTraceCard(trace) {
   const card = document.createElement('div');
-  card.className = 'card';
+  card.className = 'card expanded'; // open by default
   const toolsCount = trace.toolCalls?.length || 0;
   const totalTokens = (trace.promptTokens || 0) + (trace.completionTokens || 0);
-  card.innerHTML = `
-    <div class="card-header" onclick="toggleCard(this)">
-      <h3>Turn ${trace.turnIndex}</h3>
-      <div class="meta">
-        ${totalTokens} tokens | ${trace.durationMs}ms | ${toolsCount} tool call${toolsCount !== 1 ? 's' : ''} | ${esc(trace.model)}
+  const time = trace.timestamp ? new Date(trace.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+
+  // Render conversation messages (open by default)
+  const msgs = trace.messages || [];
+  const chatHtml = msgs.map(m => {
+    const role = m.role || 'system';
+    const ts = m.timestamp ? new Date(m.timestamp).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : '';
+    if (role === 'tool' || role === 'system') return ''; // shown in foldable sections
+    return `<div class="chat-bubble ${role}">
+      <div class="chat-role ${role}">${role}${ts ? `<span class="chat-time">${ts}</span>` : ''}</div>
+      ${esc(m.content)}
+    </div>`;
+  }).join('');
+
+  // System prompt (foldable, closed by default)
+  const sysPrompt = trace.systemPrompt || '';
+  const sysHtml = sysPrompt ? `
+    <div class="trace-section">
+      <div class="trace-section-header" onclick="this.classList.toggle('open')">
+        <span class="arrow">▶</span> System Prompt (${estimateTokens(sysPrompt)} tokens)
       </div>
-    </div>
-    <div class="card-body">
-      <div style="margin-bottom:8px"><strong style="color:#8b949e;font-size:12px">Input</strong></div>
-      <pre>${esc(typeof trace.input === 'string' ? trace.input : (trace.input?.content || JSON.stringify(trace.input)))}</pre>
-      ${toolsCount > 0 ? `
-        <div style="margin:12px 0 8px"><strong style="color:#8b949e;font-size:12px">Tool Calls</strong></div>
+      <div class="trace-section-body"><pre>${esc(sysPrompt)}</pre></div>
+    </div>` : '';
+
+  // Tool calls (foldable, closed by default)
+  const toolHtml = toolsCount > 0 ? `
+    <div class="trace-section">
+      <div class="trace-section-header" onclick="this.classList.toggle('open')">
+        <span class="arrow">▶</span> Tool Calls (${toolsCount})
+      </div>
+      <div class="trace-section-body">
         ${trace.toolCalls.map(tc => `
           <div class="tool-call">
             <span class="tool-name">${esc(tc.name)}</span>
@@ -449,19 +493,49 @@ function renderTraceCard(trace) {
             <pre style="border:none;padding:4px 0;color:#8b949e;max-height:200px;overflow:auto">${esc(tc.result?.substring(0, 500) || '')}</pre>
           </div>
         `).join('')}
-      ` : ''}
-      <div style="margin:12px 0 8px"><strong style="color:#8b949e;font-size:12px">Reply</strong></div>
-      <pre>${esc(trace.reply)}</pre>
-      <div class="stat-row" style="margin-top:8px">
-        Prompt tokens: <span>${trace.promptTokens}</span> |
-        Completion tokens: <span>${trace.completionTokens}</span> |
-        Duration: <span>${trace.durationMs}ms</span> |
-        Time: <span>${esc(trace.timestamp)}</span>
+      </div>
+    </div>` : '';
+
+  // Context messages — tool and system messages from history (foldable)
+  const contextMsgs = msgs.filter(m => m.role === 'tool' || m.role === 'system');
+  const contextHtml = contextMsgs.length > 0 ? `
+    <div class="trace-section">
+      <div class="trace-section-header" onclick="this.classList.toggle('open')">
+        <span class="arrow">▶</span> Context Messages (${contextMsgs.length})
+      </div>
+      <div class="trace-section-body">
+        ${contextMsgs.map(m => `<div class="chat-bubble ${m.role}">
+          <div class="chat-role ${m.role}">${m.role}</div>
+          ${esc(m.content.length > 500 ? m.content.slice(0, 500) + '...' : m.content)}
+        </div>`).join('')}
+      </div>
+    </div>` : '';
+
+  card.innerHTML = `
+    <div class="card-header" onclick="toggleCard(this)">
+      <h3>Turn ${trace.turnIndex} <span class="chat-time">${time}</span></h3>
+      <div class="meta">
+        ${totalTokens} tok · ${trace.durationMs}ms · ${toolsCount} tools · ${esc(trace.model)}
+      </div>
+    </div>
+    <div class="card-body">
+      ${chatHtml}
+      <div class="chat-bubble assistant">
+        <div class="chat-role assistant">assistant</div>
+        ${esc(trace.reply)}
+      </div>
+      ${sysHtml}
+      ${toolHtml}
+      ${contextHtml}
+      <div class="stat-row" style="margin-top:12px">
+        ${trace.promptTokens}↓ ${trace.completionTokens}↑ · ${trace.durationMs}ms · ${esc(trace.timestamp)}
       </div>
     </div>
   `;
   return card;
 }
+
+function estimateTokens(text) { return Math.ceil(text.length / 4); }
 
 // --- Memory ---
 async function loadMemory() {
