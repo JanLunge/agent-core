@@ -19,6 +19,7 @@ import { TelegramConnector } from '../channel/telegram/connector.js';
 import { HeartbeatScheduler } from '../heartbeat/scheduler.js';
 import { createGateway } from '../gateway/server.js';
 import { startWsChat } from '../tui/ws-client.js';
+import { runSetup } from './setup.js';
 
 const program = new Command();
 
@@ -200,6 +201,14 @@ program
       console.error('Failed to load config:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
+  });
+
+program
+  .command('setup')
+  .description('Interactive setup wizard for agent-core')
+  .option('-d, --dir <path>', 'Base directory', '.')
+  .action(async (opts) => {
+    await runSetup(resolve(opts.dir));
   });
 
 function resolveProvider(config: ReturnType<typeof loadConfig>, providerName: string) {
