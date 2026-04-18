@@ -114,6 +114,21 @@ export class ConversationStore {
     return row.count;
   }
 
+  getMessagesWithMeta(conversationId: string): MessageWithMeta[] {
+    const rows = this.db.prepare(
+      `SELECT * FROM messages WHERE conversation_id = ? ORDER BY id ASC`,
+    ).all(conversationId) as MessageRow[];
+    return rows.map((row) => ({
+      id: row.id,
+      role: row.role,
+      content: row.content,
+      name: row.name ?? undefined,
+      tool_call_id: row.tool_call_id ?? undefined,
+      tool_calls: row.tool_calls ? JSON.parse(row.tool_calls) : undefined,
+      timestamp: row.created_at,
+    }));
+  }
+
   getLastMessage(conversationId: string): { role: string; content: string; created_at: string } | undefined {
     return this.db.prepare(
       'SELECT role, content, created_at FROM messages WHERE conversation_id = ? ORDER BY id DESC LIMIT 1',
@@ -144,6 +159,16 @@ interface MessageRow {
   tool_call_id: string | null;
   tool_calls: string | null;
   created_at: string;
+}
+
+export interface MessageWithMeta {
+  id: number;
+  role: string;
+  content: string;
+  name?: string;
+  tool_call_id?: string;
+  tool_calls?: unknown;
+  timestamp: string;
 }
 
 function rowToMessage(row: MessageRow): Message {

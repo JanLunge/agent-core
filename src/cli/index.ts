@@ -26,6 +26,7 @@ import { getMasterKey } from '../secrets/keychain.js';
 import { Vault } from '../secrets/vault.js';
 import { AuditLog } from '../secrets/audit.js';
 import { SecretResolver } from '../secrets/resolver.js';
+import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
 
 const program = new Command();
 
@@ -85,7 +86,9 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
 
   if (opts.model) agentConfig.model = opts.model;
 
-  const provider = resolveProvider(config, agentConfig.provider);
+  const costTracker = new CostTracker();
+  const rawProvider = resolveProvider(config, agentConfig.provider);
+  const provider = createCostTrackingProvider(rawProvider, costTracker);
   const store = new ConversationStore(dataDir);
   const traceStore = new TraceStore(dataDir);
   const memoryStore = new MemoryStore(dataDir);
@@ -125,7 +128,7 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
     for (const conn of mcpConnections) conn.close();
   };
 
-  return { config, agentConfig, agent, router, registry, traceStore, store, memoryStore, secretResolver, mcpConnections, baseDir, cleanup };
+  return { config, agentConfig, agent, router, registry, traceStore, store, memoryStore, secretResolver, costTracker, mcpConnections, baseDir, cleanup };
 }
 
 program
@@ -149,7 +152,7 @@ program
   .option('-a, --agent <name>', 'Agent name (defaults to first found)')
   .option('-m, --model <model>', 'Override the model')
   .action(async (opts) => {
-    const { config, agentConfig, agent, router, traceStore, memoryStore, store, secretResolver, baseDir, cleanup } = await setupAgent(opts);
+    const { config, agentConfig, agent, router, traceStore, memoryStore, store, secretResolver, costTracker, baseDir, cleanup } = await setupAgent(opts);
 
     const shutdownHandlers: (() => void)[] = [cleanup];
 
@@ -160,6 +163,8 @@ program
       traceStore,
       memoryStore,
       conversationStore: store,
+      config,
+      costTracker,
     });
     await gateway.start();
     shutdownHandlers.push(() => { gateway.stop(); });

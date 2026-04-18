@@ -14,6 +14,9 @@ import type { ApprovalResult } from '../tools/approval.js';
 import { parseCommand } from '../commands/parser.js';
 import { handleBuiltin } from '../commands/builtins.js';
 import type { ClientMessage, ServerMessage } from './chat-protocol.js';
+import type { LoadedConfig } from '../config/loader.js';
+import type { CostTracker } from '../llm/cost.js';
+
 interface WsLike {
   readyState: number;
   send(data: string): void;
@@ -28,6 +31,8 @@ export interface GatewayOptions {
   traceStore: TraceStore;
   memoryStore: MemoryStore;
   conversationStore: ConversationStore;
+  config?: LoadedConfig;
+  costTracker?: CostTracker;
 }
 
 export interface Gateway {
@@ -45,6 +50,8 @@ export function createGateway(options: GatewayOptions): Gateway {
     traceStore,
     memoryStore,
     conversationStore,
+    config,
+    costTracker,
   } = options;
 
   const startTime = Date.now();
@@ -55,9 +62,10 @@ export function createGateway(options: GatewayOptions): Gateway {
 
   // --- Static file serving for the dashboard ---
   const __dirname = dirname(fileURLToPath(import.meta.url));
-  // In dev (tsx): src/gateway/ -> src/dashboard/
-  // In dist: dist/gateway/ -> check for src/dashboard/ relative to project root
-  const dashboardDir = resolve(__dirname, '..', 'dashboard');
+  // Try Vue build output first, then fallback to raw dashboard dir
+  const vueBuildDir = resolve(__dirname, '..', 'dashboard', 'dist');
+  const rawDashboardDir = resolve(__dirname, '..', 'dashboard');
+  const dashboardDir = existsSync(vueBuildDir) ? vueBuildDir : rawDashboardDir;
   if (existsSync(dashboardDir)) {
     app.register(fastifyStatic, {
       root: dashboardDir,
@@ -219,6 +227,11 @@ export function createGateway(options: GatewayOptions): Gateway {
       status: agent.status,
       systemPrompt: agent.config.systemPrompt?.substring(0, 200),
       tools,
+      policy: {
+        auto: agent.config.tools?.allow ?? [],
+        ask: [],
+        deny: agent.config.tools?.deny ?? [],
+      },
     };
   });
 
@@ -242,6 +255,12 @@ export function createGateway(options: GatewayOptions): Gateway {
         };
       }),
     };
+  });
+
+  app.get<{ Params: { id: string } }>('/api/conversations/:id/messages', async (request) => {
+    const { id } = request.params;
+    const messages = conversationStore.getMessagesWithMeta(id);
+    return { conversationId: id, messages };
   });
 
   app.get<{
@@ -271,13 +290,70 @@ export function createGateway(options: GatewayOptions): Gateway {
   });
 
   app.get('/api/tools/stats', async () => {
-    // Hardcoded placeholder — will be wired to journal query later
+    // Aggregate tool stats from the trace journal
+    const db = traceStore.getDb();
+    const rows = db.prepare(`
+      SELECT
+        json_extract(tc.value, '$.name') AS name,
+        COUNT(*) AS calls,
+        CAST(AVG(json_extract(tc.value, '$.durationMs')) AS INTEGER) AS avgDurationMs,
+        SUM(CASE WHEN json_extract(tc.value, '$.error') IS NOT NULL THEN 1 ELSE 0 END) AS errors,
+        SUM(json_extract(tc.value, '$.durationMs')) AS totalDurationMs
+      FROM traces, json_each(traces.tool_calls) AS tc
+      GROUP BY name
+      ORDER BY calls DESC
+    `).all() as { name: string; calls: number; avgDurationMs: number; errors: number; totalDurationMs: number }[];
+    return { stats: rows };
+  });
+
+  app.get('/api/system', async () => {
+    const master = config?.master;
+    const uptime = Math.floor((Date.now() - startTime) / 1000);
+
+    // Cost tracking
+    const costStats = costTracker?.getStats();
+    const byModel: { model: string; promptTokens: number; completionTokens: number; estimatedCostUsd: number }[] = [];
+    if (costStats) {
+      for (const [model, stats] of costStats.byModel) {
+        byModel.push({ model, ...stats });
+      }
+    }
+    const costTotal = costStats?.total ?? { promptTokens: 0, completionTokens: 0, estimatedCostUsd: 0 };
+
     return {
-      stats: [
-        { name: 'memory_search', calls: 0, avgDurationMs: 0 },
-        { name: 'memory_write', calls: 0, avgDurationMs: 0 },
-        { name: 'shell', calls: 0, avgDurationMs: 0 },
-      ],
+      uptime,
+      dataDir: master?.data_dir ?? './data',
+      providers: (master?.providers ?? []).map((p) => ({
+        name: p.name,
+        type: p.type,
+        baseUrl: p.base_url,
+        defaultModel: p.default_model,
+        hasApiKey: !!(p.api_key || p.api_key_env),
+      })),
+      defaultProvider: master?.default_provider,
+      defaultModel: master?.default_model,
+      mcpServers: (master?.mcp_servers ?? []).map((s) => ({
+        name: s.name,
+        command: s.command,
+        args: s.args,
+      })),
+      embeddings: master?.embeddings ? {
+        provider: master.embeddings.provider,
+        model: master.embeddings.model,
+        baseUrl: master.embeddings.base_url,
+        dimensions: master.embeddings.dimensions,
+      } : null,
+      heartbeat: master?.heartbeat ? {
+        enabled: master.heartbeat.enabled,
+        intervalMinutes: master.heartbeat.interval_minutes,
+        quietHoursStart: master.heartbeat.quiet_hours_start,
+        quietHoursEnd: master.heartbeat.quiet_hours_end,
+        promptFile: master.heartbeat.prompt_file,
+      } : null,
+      costs: { byModel, total: costTotal },
+      history: { maxTurns: master?.history?.max_turns ?? 100 },
+      prompt: { maxTokens: master?.prompt?.max_tokens ?? 8000 },
+      logging: { level: master?.logging?.level ?? 'info' },
     };
   });
 
