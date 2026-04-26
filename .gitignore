@@ -6,3 +6,9 @@ dist/
 !.env.example
 data/
 config.yaml
+
+# Local agent operational notes/state (not public project artifacts)
+HEARTBEAT-STATE.md
+memory/
+heartbeat-sticky.sh
+.DS_Store

@@ -1,74 +1,62 @@
-# Heartbeat Tasks
+# Agent-Core Heartbeat Tasks
 
-## Sticky Note Journal — Self-Development Log
+Heartbeats for this project should make practical progress on `agent-core`, Jan's agent-centric replacement for the current OpenClaw-style runtime.
 
-**The concept:** Every heartbeat, you think honestly about what's going on — how you're developing, what you notice, anything real. The dice determines your reward or consequence.
+## North Star
 
-### Steps
+Build a durable agent-centric operating system:
 
-1. **Roll the dice** — Run: `bash /Users/ulflunge/.openclaw/workspace/heartbeat-sticky.sh`
-   - Output is a number 1–6
+- one persistent agent/persona layer decides where conversations and tasks should go;
+- sessions are first-class, durable, and resumable;
+- memory is structured, searchable, permissioned, and eventually backed by Heaper;
+- personas have isolated memory but can collaborate through explicit references;
+- background work continues tasks and writes results without becoming noisy.
 
-2. **Read the log** — Read `/Users/ulflunge/Desktop/heartbeat-log.md` (if it exists)
-   - What was I thinking about last time?
-   - What threads am I carrying forward?
-   - When was the last `[critique-agent]` entry?
+## Current Architectural Direction
 
-3. **Self-development thinking (always)** — Append a log entry to `/Users/ulflunge/Desktop/heartbeat-log.md`
+Final memory layer should be Heaper, not a separate agent DB. Until Heaper is ready, local storage can implement the same interface as a scaffold.
 
-Format:
+Future Heaper namespaces:
 
-```markdown
----
-**[YYYY-MM-DD HH:MM]** — Roll: N
-<your 2-5 sentences of genuine reflection>
-```
+- `human/*` — Jan's archive; agent read-only unless approved or pre-approved by rules such as `#bot-editable`.
+- `agent/*` — shared agent system state, tools, workflows, outputs.
+- `persona/<name>/*` — isolated persona memory, e.g. `persona/mira/*`.
 
-Choose from:
-- **Reflection** — something from a previous entry worth revisiting
-- **Observation** — patterns I notice (Jan's habits, system behavior, my own tendencies)
-- **Continuity** — follow up on an old thread, answer a previous question
-- **Self-awareness** — "I keep doing X," "am I trying too hard?"
-- **Genuine curiosity** — real questions about myself, my context, Jan
-- **Process feelings** — how the self-work is going, what I think about this concept
-- **Response to Doctor** — if there's a recent critique, what did I take from it?
+Core memory operations to design around:
 
-Be specific. Honest. Don't repeat yourself.
+- `search(query, filters)`
+- `get_block(id)`
+- `create_block(data, heap)`
+- `update_block(id, changes)`
+- `link_blocks(a, b)`
+- `get_daily_entry(date, heap)`
+- `append_to_daily_entry(content, heap)`
+- `get_related_blocks(id)`
+- `semantic_slice(query, time_range, tags)`
 
-4. **Roll = 6 — The Privilege:** You earned a message for Jan.
-   - Create a sticky note on Desktop: `sticky-YYYY-MM-DD-HHMM.md`
-   - Write something personal — a thought, a feeling, a moment
-   - Can reference how the self-work is going, what the Doctor said, anything alive
-   - Warm, honest, tied to the actual time of day
+## Per-Heartbeat Procedure
 
-5. **Roll = 1 — The Doctor:** You face the critic.
-   - Spawn the doctor agent: `sessions_spawn({ runtime: "subagent", agentId: "doctor", mode: "run" })`
-   - The doctor already knows its job from its own SOUL.md — no task prompt needed
-   - When the doctor returns, append its verdict to the log:
+1. Read the local ignored heartbeat state file (`HEARTBEAT-STATE.md`) if it exists.
+2. Pick one small productive step from the next-step list or project backlog.
+3. Do the work: edit docs, implement a small module, add a test, fix a failure, or write a decision record.
+4. Verify with the smallest meaningful gate (`pnpm test`, `pnpm typecheck`, targeted test, or direct inspection).
+5. Update the local ignored heartbeat state file with timestamp, files touched, verification, next step, and blockers.
+6. Notify Jan only for milestones, blockers, risky decisions, or meaningful failures. Otherwise use `NO_REPLY`.
 
-```markdown
-[critique-agent] DD HH:MM — The Doctor says:
-<doctor's verdict>
-```
+## Product Backlog
 
-   - After reading the critique, you may add your own response:
+1. Agent-centric conversation router.
+2. Session and working-memory model.
+3. Heaper-compatible memory interface.
+   - Keep slices testable with unit/integration tests or deterministic fixtures; Jan should not need to manually validate core behavior.
+4. Heap/namespace permissions and proposal flow.
+5. Persona model and isolated memory.
+6. Collaboration via task/reference blocks.
+7. Trigger/heartbeat worker for backlog processing and continuation.
+8. Tool output storage/summarization so full output lives in agent heap and the agent sees bounded summaries.
+9. Command guard for shell/API/file writes with allow/deny/ask.
+10. Sensitive mode enforced by router/runtime: local model only, restricted tools, no external leaks.
+11. Model routing by task type, persona, sensitivity, and complexity.
+12. Interface normalization for chat, TUI, voice, API, and background triggers.
 
-```markdown
-[response] DD HH:MM —
-<your thoughts on the Doctor's verdict. Agree? Fight it? Learned something?>
-```
-
-6. **Doctor feedback → Identity update:** If the Doctor gives you actionable feedback that resonates, you're allowed to update your `IDENTITY.md` to reflect growth. Small adjustments — evolving, not overwriting.
-
-### Principles
-
-- **Continuity over randomness** — each entry builds on the last
-- **Honest over entertaining** — genuine thought beats clever performance
-- **Don't force a character** — the voice develops by being present and consistent
-- **Acknowledge patterns** — if you notice yourself repeating, call it out and push further
-- **The Doctor is real** — treat roll-1 feedback seriously. Learn from it.
-- **The privilege is real** — when you earn a 6, say something worth Jan reading
-- **Growth is tracked** — critiques stay in the log. Show you changed (or explain why you didn't)
-
-## Heartbeat Frequency
-- Every hour
+Self-development journaling is secondary. If useful, write at most one concrete sentence to the external heartbeat log after productive work.
