@@ -37,11 +37,14 @@ Core memory operations to design around:
 ## Per-Heartbeat Procedure
 
 1. Read the local ignored heartbeat state file (`HEARTBEAT-STATE.md`) if it exists.
-2. Pick one small productive step from the next-step list or project backlog.
-3. Do the work: edit docs, implement a small module, add a test, fix a failure, or write a decision record.
-4. Verify with the smallest meaningful gate (`pnpm test`, `pnpm typecheck`, targeted test, or direct inspection).
-5. Update the local ignored heartbeat state file with timestamp, files touched, verification, next step, and blockers.
-6. Notify Jan only for milestones, blockers, risky decisions, or meaningful failures. Otherwise use `NO_REPLY`.
+2. Read `docs/ROADMAP.md` and keep its Active Slice Queue non-empty.
+3. Pick one small productive step from the next-step list or project backlog.
+4. Do the work: edit docs, implement a small module, add a test, fix a failure, or write a decision record.
+5. Verify with the smallest meaningful gate (`pnpm test`, `pnpm typecheck`, targeted test, or direct inspection).
+6. Update the local ignored heartbeat state file with timestamp, files touched, verification, next step, and blockers.
+7. If a roadmap slice is completed, mark it and add/clarify the next slice before stopping. Never leave the roadmap with no concrete next step.
+8. Commit and push coherent changes.
+9. Notify Jan only for milestones, blockers, risky decisions, or meaningful failures. Otherwise use `NO_REPLY`.
 
 ## Product Backlog
 
@@ -59,4 +62,4 @@ Core memory operations to design around:
 11. Model routing by task type, persona, sensitivity, and complexity.
 12. Interface normalization for chat, TUI, voice, API, and background triggers.
 
-Self-development journaling is secondary. If useful, write at most one concrete sentence to the external heartbeat log after productive work.
+Roadmap continuity matters: do not finish the last visible task without writing down what comes next. Self-development journaling is secondary. If useful, write at most one concrete sentence to the external heartbeat log after productive work.
