@@ -46,6 +46,10 @@ Core memory operations to design around:
 8. Commit and push coherent changes.
 9. Notify Jan only for milestones, blockers, risky decisions, or meaningful failures. Otherwise use `NO_REPLY`.
 
+## Overnight Planning Rule
+
+Before Jan is likely away or asleep, keep at least **10 actionable roadmap slices** ready in `docs/ROADMAP.md`, plus explicit feedback checkpoints. If the queue drops below 10, extend the roadmap before doing more implementation. If a feedback checkpoint is reached, write the question into local `HEARTBEAT-STATE.md`, commit/push safe preparatory work, and either switch to an unrelated safe slice or stop for Jan.
+
 ## Product Backlog
 
 1. Agent-centric conversation router.

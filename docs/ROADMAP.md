@@ -13,6 +13,25 @@ Every work session should end with:
 
 Use `docs/BUILD-ORDER.md` for phase-level acceptance tests and this file for rolling implementation slices.
 
+## Overnight / Long-Run Rule
+
+Before Jan is likely to be away or asleep, maintain at least **10 concrete slices of headroom** or an explicit feedback checkpoint. If fewer than 10 actionable slices remain, pause implementation planning long enough to extend this roadmap before continuing.
+
+It is fine to have no task when genuinely blocked or when Jan has paused the project. Otherwise, prefer working through the queue in order, committing/pushing each coherent slice.
+
+## Feedback Checkpoints
+
+Stop and ask Jan before continuing if any of these become the active decision:
+
+1. **Heaper API shape conflict** — if the local scaffold wants operations that do not fit Jan's Heaper concept of blocks/heaps/links.
+2. **Permission semantics ambiguity** — if implementation needs a policy for writing to `human/*` beyond explicit approval / `#bot-editable`.
+3. **Persona behavior product decision** — if routing requires deciding how personas should feel or speak, not just technical isolation.
+4. **External data movement** — if a slice would send private/sensitive data to remote APIs or require new credentials.
+5. **Destructive migration** — if moving existing memory/session data would require deletion or irreversible schema changes.
+6. **UI/product workflow choice** — if there are multiple visible UX directions and no obvious safe default.
+
+If a feedback checkpoint is reached during the night, write the question into local `HEARTBEAT-STATE.md`, commit/push any safe preparatory work, and stop that branch. Continue only on unrelated safe slices if available.
+
 ## Current Progress
 
 - [x] Capture Heaper-compatible architecture and safety/runtime decisions.
@@ -70,6 +89,100 @@ Validation:
 - full output can be retrieved by reference;
 - search within stored output works through memory API.
 
+### Slice 6 — Daily continuity reader
+
+Goal: provide a small API that reads today + yesterday daily entries for a heap and returns bounded startup context.
+
+Validation:
+- empty days return an empty context object;
+- today/yesterday entries are ordered predictably;
+- linked session summaries can be included by reference.
+
+### Slice 7 — Session working-memory selector
+
+Goal: combine recent session messages with relevant HeaperMemory retrieval into a bounded working-memory bundle.
+
+Validation:
+- recent messages are preserved in order;
+- relevant search results are deduplicated;
+- token/size limits are applied deterministically.
+
+### Slice 8 — Persona heap resolver
+
+Goal: map agent/persona names to default heaps and enforce that persona-private memory stays isolated by default.
+
+Validation:
+- Mira resolves to `persona/mira/*` defaults;
+- shared system work resolves to `agent/*`;
+- another persona cannot read Mira-private blocks unless linked/shared.
+
+### Slice 9 — Task block model
+
+Goal: represent async/background work as Heaper-compatible task blocks with status, owner, origin session, and result links.
+
+Validation:
+- create pending task;
+- transition to running/done/blocked;
+- link result blocks;
+- query resumable tasks.
+
+### Slice 10 — Background continuation worker skeleton
+
+Goal: process resumable task blocks without depending on real cron or Heaper integration yet.
+
+Validation:
+- selects pending/resumable tasks;
+- skips blocked tasks;
+- writes progress/result blocks;
+- returns notification intent only for milestones/blockers.
+
+### Slice 11 — Model routing policy types
+
+Goal: define model-selection inputs/outputs around task type, persona, sensitivity, complexity, and availability.
+
+Validation:
+- sensitive tasks require local model;
+- non-sensitive complex tasks can request stronger remote model;
+- persona defaults are respected.
+
+### Slice 12 — Sensitive-mode enforcement tests
+
+Goal: prove sensitive mode constrains model routing and tools at the runtime boundary, not via agent prompt instructions.
+
+Validation:
+- external API tools denied;
+- local-only model required;
+- allowed local/read-only tools still work;
+- violations produce auditable denial reasons.
+
+### Slice 13 — Proposal flow for human heap writes
+
+Goal: agent attempts to mutate `human/*` become proposal blocks unless approval/pre-approved tags allow direct write.
+
+Validation:
+- unapproved write creates proposal;
+- approved write applies update;
+- proposal links target block and originating session/task.
+
+### Slice 14 — Interface adapters as event factories
+
+Goal: normalize chat/TUI/API/background input into the same event shape without invoking the full runtime.
+
+Validation:
+- each adapter produces equivalent core fields;
+- surface-specific metadata is preserved separately;
+- routing is independent of input surface.
+
+### Slice 15 — Progress reporter
+
+Goal: generate a concise progress report from git + roadmap + test status so Jan can ask "where are we?" and get a grounded answer.
+
+Validation:
+- includes latest commit;
+- includes test/typecheck status;
+- includes completed/current/next slices;
+- includes blockers/feedback checkpoints.
+
 ## Reporting Template
 
 When Jan asks for progress, report:
@@ -79,4 +192,4 @@ When Jan asks for progress, report:
 - completed slice;
 - active slice;
 - next 1-3 planned slices;
-- blockers, if any.
+- blockers or feedback checkpoints, if any.
