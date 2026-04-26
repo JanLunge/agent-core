@@ -48,7 +48,7 @@ Core memory operations to design around:
 
 ## Overnight Planning Rule
 
-Before Jan is likely away or asleep, keep at least **10 actionable roadmap slices** ready in `docs/ROADMAP.md`, plus explicit feedback checkpoints. If the queue drops below 10, extend the roadmap before doing more implementation. If a feedback checkpoint is reached, write the question into local `HEARTBEAT-STATE.md`, commit/push safe preparatory work, and either switch to an unrelated safe slice or stop for Jan.
+Before Jan is likely away or asleep, keep at least **10 actionable roadmap slices** ready in `docs/ROADMAP.md`, plus explicit feedback checkpoints. If the queue drops below 10, extend the roadmap before doing more implementation. If a feedback checkpoint is reached, write the question into local `HEARTBEAT-STATE.md`, commit/push safe preparatory work, and switch to an unrelated safe slice when available instead of stopping all work.
 
 ## Product Backlog
 

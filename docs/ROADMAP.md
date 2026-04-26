@@ -30,7 +30,7 @@ Stop and ask Jan before continuing if any of these become the active decision:
 5. **Destructive migration** — if moving existing memory/session data would require deletion or irreversible schema changes.
 6. **UI/product workflow choice** — if there are multiple visible UX directions and no obvious safe default.
 
-If a feedback checkpoint is reached during the night, write the question into local `HEARTBEAT-STATE.md`, commit/push any safe preparatory work, and stop that branch. Continue only on unrelated safe slices if available.
+If a feedback checkpoint is reached during the night, write the question into local `HEARTBEAT-STATE.md`, commit/push any safe preparatory work, and stop that branch. Then continue on unrelated safe slices when available rather than stopping all work.
 
 ## Current Progress
 
