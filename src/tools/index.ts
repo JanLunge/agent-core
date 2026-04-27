@@ -46,6 +46,17 @@ export {
 } from './output-blocks.js';
 
 export {
+  type BoundaryToolDeclaration,
+  type BoundaryToolExecution,
+  type BoundaryToolKind,
+  type BoundaryToolRegistry,
+  type BoundaryToolSensitivity,
+  type ExecuteBoundaryToolInput,
+  createBoundaryToolRegistry,
+  executeBoundaryTool,
+} from './boundary.js';
+
+export {
   type McpServerConfig,
   type McpToolDefinition,
   McpConnection,

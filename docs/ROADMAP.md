@@ -55,6 +55,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 15 progress reporter.
 - [x] Add Slice 16 runtime orchestration skeleton.
 - [x] Add Slice 17 deterministic fake agent harness.
+- [x] Add Slice 18 typed tool registry and execution boundary.
 
 ## Active Slice Queue
 
@@ -254,7 +255,7 @@ Validation:
 
 Status: implemented in `src/runtime/fake-agent.ts` with tests in `src/runtime/fake-agent.test.ts`.
 
-### Slice 18 — Tool registry and execution boundary
+### Slice 18 — Tool registry and execution boundary ✅
 
 Goal: introduce a typed tool registry that checks guard decisions before executing local/internal tool handlers.
 
@@ -263,6 +264,8 @@ Validation:
 - execution is blocked when guard denies or asks;
 - allowed local read-only tool returns bounded output refs;
 - audit trail links tool intent, decision, and result block.
+
+Status: implemented in `src/tools/boundary.ts` with tests in `src/tools/boundary.test.ts`.
 
 ### Slice 19 — Session store adapter
 
