@@ -45,6 +45,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 5 tool output blocks with bounded agent summaries.
 - [x] Add Slice 6 daily continuity reader.
 - [x] Add Slice 7 working-memory selector.
+- [x] Add Slice 8 persona heap resolver.
 
 ## Active Slice Queue
 
@@ -128,7 +129,7 @@ Validation:
 
 Status: implemented in `src/conversation/working-memory.ts` with tests in `src/conversation/working-memory.test.ts`.
 
-### Slice 8 — Persona heap resolver
+### Slice 8 — Persona heap resolver ✅
 
 Goal: map agent/persona names to default heaps and enforce that persona-private memory stays isolated by default.
 
@@ -136,6 +137,8 @@ Validation:
 - Mira resolves to `persona/mira/*` defaults;
 - shared system work resolves to `agent/*`;
 - another persona cannot read Mira-private blocks unless linked/shared.
+
+Status: implemented in `src/heaper/persona-resolver.ts` with tests in `src/heaper/persona-resolver.test.ts`.
 
 ### Slice 9 — Task block model
 
