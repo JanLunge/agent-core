@@ -53,6 +53,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 13 human heap write proposal flow.
 - [x] Add Slice 14 interface adapters as event factories.
 - [x] Add Slice 15 progress reporter.
+- [x] Add Slice 16 runtime orchestration skeleton.
 
 ## Active Slice Queue
 
@@ -228,7 +229,7 @@ Validation:
 
 Status: implemented in `src/reporting/progress.ts` with tests in `src/reporting/progress.test.ts`.
 
-### Slice 16 — Runtime orchestration skeleton
+### Slice 16 — Runtime orchestration skeleton ✅
 
 Goal: connect normalized events, router decisions, working memory, model routing, guarded tool planning, and result persistence into one testable runtime function without requiring real model calls yet.
 
@@ -237,6 +238,8 @@ Validation:
 - writes session/user/assistant message blocks or summaries to the correct heap;
 - includes bounded working memory in the prepared agent context;
 - records guard/model decisions as auditable refs.
+
+Status: implemented in `src/runtime/orchestrator.ts` with tests in `src/runtime/orchestrator.test.ts`.
 
 ### Slice 17 — Deterministic fake agent harness
 
