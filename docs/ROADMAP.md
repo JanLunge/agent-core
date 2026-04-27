@@ -222,6 +222,136 @@ Validation:
 - includes completed/current/next slices;
 - includes blockers/feedback checkpoints.
 
+### Slice 16 — Runtime orchestration skeleton
+
+Goal: connect normalized events, router decisions, working memory, model routing, guarded tool planning, and result persistence into one testable runtime function without requiring real model calls yet.
+
+Validation:
+- accepts a normalized event and returns a runtime outcome;
+- writes session/user/assistant message blocks or summaries to the correct heap;
+- includes bounded working memory in the prepared agent context;
+- records guard/model decisions as auditable refs.
+
+### Slice 17 — Deterministic fake agent harness
+
+Goal: add a fake model/agent harness for end-to-end tests so the runtime can validate behavior without external APIs.
+
+Validation:
+- fake agent receives context and returns scripted replies/tool intents;
+- runtime handles a plain reply;
+- runtime handles a guarded tool denial;
+- tests are deterministic and do not require credentials.
+
+### Slice 18 — Tool registry and execution boundary
+
+Goal: introduce a typed tool registry that checks guard decisions before executing local/internal tool handlers.
+
+Validation:
+- registered tools declare kind, sensitivity, and required permissions;
+- execution is blocked when guard denies or asks;
+- allowed local read-only tool returns bounded output refs;
+- audit trail links tool intent, decision, and result block.
+
+### Slice 19 — Session store adapter
+
+Goal: provide a session store abstraction backed by HeaperMemory so sessions can be created, resumed, summarized, and searched consistently.
+
+Validation:
+- create/resume by routed session id;
+- append user/assistant/tool messages;
+- produce summary blocks;
+- retrieve recent slice independent of input surface.
+
+### Slice 20 — Router persistence and route history
+
+Goal: persist routing decisions as blocks so later agents can explain why a conversation went to a session/persona/mode.
+
+Validation:
+- each route decision is stored with event ref and session ref;
+- repeated channel/session routing is explainable from history;
+- sensitive/model/persona decisions are queryable;
+- route records are bounded and do not copy full private context.
+
+### Slice 21 — Approval request model
+
+Goal: represent ask/approval decisions as durable approval-request blocks that can later be surfaced in UI or chat.
+
+Validation:
+- risky file/API/shell decisions create approval request refs;
+- request captures exact proposed operation;
+- approval/denial transitions are auditable;
+- applying approval resumes or unblocks the originating task/session.
+
+### Slice 22 — Notification policy layer
+
+Goal: centralize when the system should notify Jan versus stay quiet for live, async, heartbeat, and background modes.
+
+Validation:
+- blockers and completed milestones request notification;
+- ordinary background progress stays silent;
+- live chat returns a direct response;
+- notification intents include concise reason and linked refs.
+
+### Slice 23 — Error and blocker taxonomy
+
+Goal: define structured runtime errors/blockers so failures become resumable task/session state instead of lost exceptions.
+
+Validation:
+- classify missing credentials, denied permission, test failure, tool failure, and feedback checkpoint;
+- worker stores blocker details and next action;
+- progress reporter includes active blockers;
+- sensitive details are redacted in summaries.
+
+### Slice 24 — Local durable storage adapter
+
+Goal: add a simple durable local storage implementation for HeaperMemory semantics, likely file-backed JSONL or SQLite, while preserving the future Heaper interface.
+
+Validation:
+- blocks survive process restart in tests;
+- links and daily entries round-trip;
+- search/filter behavior matches in-memory scaffold fixtures;
+- no destructive migration of existing data is required.
+
+### Slice 25 — Heaper adapter contract tests
+
+Goal: extract shared conformance tests that any HeaperMemory implementation must pass, preparing for real Heaper integration later.
+
+Validation:
+- in-memory adapter passes conformance suite;
+- durable local adapter passes conformance suite;
+- tests cover blocks, links, permissions-facing behavior, daily entries, search, and semantic slices;
+- future Heaper adapter can reuse the same suite.
+
+### Slice 26 — Persona configuration loader
+
+Goal: load persona metadata/config from Heaper-compatible blocks or local files and feed it into routing, heap resolution, and model defaults.
+
+Validation:
+- loads persona id/name/default heaps/model preferences;
+- invalid config fails closed with useful diagnostics;
+- persona-private config is not exposed to other personas by default;
+- router can use loaded persona config deterministically.
+
+### Slice 27 — Delegation/reference workflow
+
+Goal: model agent-to-agent delegation through task blocks and shared refs rather than hidden copied context.
+
+Validation:
+- create delegation task with origin refs;
+- delegated worker sees only permitted refs;
+- result links back to origin session/task;
+- private persona blocks are not silently copied.
+
+### Slice 28 — End-to-end smoke scenario
+
+Goal: add one integration test for the intended loop: chat event -> route -> context -> fake agent -> guarded tool/output -> memory/session write -> progress report.
+
+Validation:
+- no external services or credentials;
+- covers normal mode and one sensitive-mode variant;
+- verifies all important artifacts are linked by refs;
+- progress reporter can summarize the run.
+
 ## Reporting Template
 
 When Jan asks for progress, report:
