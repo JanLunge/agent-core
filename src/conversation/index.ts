@@ -15,3 +15,9 @@ export {
   loadConversation,
 } from './conversation.js';
 export { type TurnResult, type LoopOptions, runTurn } from './loop.js';
+export {
+  type DailyContinuityContext,
+  type DailyContinuityEntry,
+  type ReadDailyContinuityOptions,
+  readDailyContinuity,
+} from './daily-continuity.js';

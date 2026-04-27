@@ -43,6 +43,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 3 explicit router planning decisions.
 - [x] Add Slice 4 auditable command/file/API guard decisions.
 - [x] Add Slice 5 tool output blocks with bounded agent summaries.
+- [x] Add Slice 6 daily continuity reader.
 
 ## Active Slice Queue
 
@@ -104,7 +105,7 @@ Validation:
 
 Status: implemented in `src/tools/output-blocks.ts` with tests in `src/tools/output-blocks.test.ts`.
 
-### Slice 6 — Daily continuity reader
+### Slice 6 — Daily continuity reader ✅
 
 Goal: provide a small API that reads today + yesterday daily entries for a heap and returns bounded startup context.
 
@@ -112,6 +113,8 @@ Validation:
 - empty days return an empty context object;
 - today/yesterday entries are ordered predictably;
 - linked session summaries can be included by reference.
+
+Status: implemented in `src/conversation/daily-continuity.ts` with tests in `src/conversation/daily-continuity.test.ts`.
 
 ### Slice 7 — Session working-memory selector
 
