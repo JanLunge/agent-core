@@ -60,6 +60,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 20 router persistence and route history.
 - [x] Add Slice 21 durable approval-request model.
 - [x] Add Slice 22 notification policy layer.
+- [x] Add Slice 23 error and blocker taxonomy.
 
 ## Active Slice Queue
 
@@ -319,7 +320,7 @@ Validation:
 
 Status: implemented in `src/notifications/policy.ts` with tests in `src/notifications/policy.test.ts`.
 
-### Slice 23 — Error and blocker taxonomy
+### Slice 23 — Error and blocker taxonomy ✅
 
 Goal: define structured runtime errors/blockers so failures become resumable task/session state instead of lost exceptions.
 
@@ -328,6 +329,8 @@ Validation:
 - worker stores blocker details and next action;
 - progress reporter includes active blockers;
 - sensitive details are redacted in summaries.
+
+Status: implemented in `src/runtime/blockers.ts` with tests in `src/runtime/blockers.test.ts`; progress reporting accepts active blocker summaries.
 
 ### Slice 24 — Local durable storage adapter
 

@@ -1,6 +1,8 @@
 import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import type { BlockRef } from '../heaper/types.js';
+import type { RuntimeBlockerKind } from '../runtime/blockers.js';
 
 export interface ProgressReporterOptions {
   cwd: string;
@@ -8,6 +10,14 @@ export interface ProgressReporterOptions {
   exec?: (command: string, args: string[], cwd: string) => string;
   testStatus?: VerificationStatus;
   typecheckStatus?: VerificationStatus;
+  activeBlockers?: ActiveBlockerSummary[];
+}
+
+export interface ActiveBlockerSummary {
+  kind: RuntimeBlockerKind;
+  title: string;
+  nextAction: string;
+  ref?: BlockRef;
 }
 
 export interface VerificationStatus {
@@ -41,7 +51,7 @@ export function generateProgressReport(options: ProgressReporterOptions): Progre
   const activeIndex = slices.findIndex((slice) => !slice.completed);
   const activeSlice = activeIndex >= 0 ? slices[activeIndex].title : undefined;
   const nextSlices = activeIndex >= 0 ? slices.slice(activeIndex + 1, activeIndex + 4).map((slice) => slice.title) : [];
-  const blockers = parseBlockers(roadmap);
+  const blockers = mergeActiveBlockers(parseBlockers(roadmap), options.activeBlockers);
   const feedbackCheckpoints = parseFeedbackCheckpoints(roadmap);
 
   const report: Omit<ProgressReport, 'text'> = {
@@ -83,6 +93,16 @@ function parseSlices(roadmap: string): Array<{ title: string; completed: boolean
 function parseBlockers(roadmap: string): string[] {
   const blockers = Array.from(roadmap.matchAll(/^[-*]\s+\[blocked\]\s+(.+)$/gim), (match) => match[1].trim());
   return blockers.length > 0 ? blockers : ['None recorded'];
+}
+
+function mergeActiveBlockers(roadmapBlockers: string[], activeBlockers?: ActiveBlockerSummary[]): string[] {
+  const active = (activeBlockers ?? []).map((blocker) => {
+    const ref = blocker.ref ? ` (${blocker.ref.heap}#${blocker.ref.id})` : '';
+    return `${blocker.title} [${blocker.kind}] — ${blocker.nextAction}${ref}`;
+  });
+  if (active.length === 0) return roadmapBlockers;
+  const staticBlockers = roadmapBlockers.filter((blocker) => blocker !== 'None recorded');
+  return [...staticBlockers, ...active];
 }
 
 function parseFeedbackCheckpoints(roadmap: string): string[] {

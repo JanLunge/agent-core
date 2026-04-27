@@ -91,6 +91,30 @@ describe('generateProgressReport', () => {
     expect(report.blockers).toEqual(['None recorded']);
   });
 
+  it('reports active runtime blockers alongside roadmap blockers', () => {
+    const { cwd, roadmapPath } = tempRoadmap();
+
+    const report = generateProgressReport({
+      cwd,
+      roadmapPath,
+      exec: () => 'abc1234 Add blockers\n',
+      activeBlockers: [
+        {
+          kind: 'missing-credentials',
+          title: 'Missing credentials',
+          nextAction: 'Ask Jan to rerun login.',
+          ref: { heap: 'agent/blockers', id: 'blocker-1' },
+        },
+      ],
+    });
+
+    expect(report.blockers).toEqual([
+      'Waiting on Jan for a product call.',
+      'Missing credentials [missing-credentials] — Ask Jan to rerun login. (agent/blockers#blocker-1)',
+    ]);
+    expect(report.text).toContain('Missing credentials [missing-credentials]');
+  });
+
   it('reports unknown commit instead of throwing when git lookup fails', () => {
     const { cwd, roadmapPath } = tempRoadmap();
 

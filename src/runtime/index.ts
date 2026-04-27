@@ -18,3 +18,21 @@ export type {
   FakeAgentHarness,
   FakeAgentScriptStep,
 } from './fake-agent.js';
+
+export {
+  classifyRuntimeBlocker,
+  createRuntimeBlockerBlock,
+  redactSensitiveDetails,
+  resolveRuntimeBlocker,
+  summarizeRuntimeBlocker,
+} from './blockers.js';
+export type {
+  ClassifyRuntimeBlockerInput,
+  CreateRuntimeBlockerInput,
+  ResolveRuntimeBlockerInput,
+  RuntimeBlockerData,
+  RuntimeBlockerKind,
+  RuntimeBlockerSeverity,
+  RuntimeBlockerStatus,
+  RuntimeBlockerSummary,
+} from './blockers.js';
