@@ -52,6 +52,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 12 sensitive-mode runtime enforcement.
 - [x] Add Slice 13 human heap write proposal flow.
 - [x] Add Slice 14 interface adapters as event factories.
+- [x] Add Slice 15 progress reporter.
 
 ## Active Slice Queue
 
@@ -215,7 +216,7 @@ Validation:
 
 Status: implemented in `src/events/adapters.ts` with tests in `src/events/adapters.test.ts`.
 
-### Slice 15 — Progress reporter
+### Slice 15 — Progress reporter ✅
 
 Goal: generate a concise progress report from git + roadmap + test status so Jan can ask "where are we?" and get a grounded answer.
 
@@ -224,6 +225,8 @@ Validation:
 - includes test/typecheck status;
 - includes completed/current/next slices;
 - includes blockers/feedback checkpoints.
+
+Status: implemented in `src/reporting/progress.ts` with tests in `src/reporting/progress.test.ts`.
 
 ### Slice 16 — Runtime orchestration skeleton
 
