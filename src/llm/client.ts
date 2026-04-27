@@ -2,6 +2,7 @@ import type { ProviderProfile } from '../config/schema.js';
 import type { LLMProvider } from './types.js';
 import type { SecretResolver } from '../secrets/resolver.js';
 import { createOpenAIProvider } from './openai-provider.js';
+import { createCodexCliProvider } from './codex-cli-provider.js';
 
 const providers = new Map<string, LLMProvider>();
 
@@ -48,6 +49,15 @@ export function createProvider(profile: ProviderProfile, resolver?: SecretResolv
       return createOpenAIProvider(profile.name, {
         apiKey: apiKey ?? 'local',
         baseURL: profile.base_url ?? 'http://localhost:11434/v1',
+      });
+
+    case 'codex-cli':
+      // Uses the official Codex CLI's existing OAuth login. Agent Core never reads
+      // token files or .env secrets; Jan owns `codex login` / OAuth setup.
+      return createCodexCliProvider(profile.name, {
+        command: profile.command,
+        cwd: profile.cwd,
+        timeoutMs: profile.timeout_ms,
       });
 
     default:

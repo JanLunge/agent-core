@@ -17,6 +17,12 @@ export {
   initProviders,
   getProvider,
 } from './client.js';
+export {
+  createCodexCliProvider,
+  type CodexCliProviderOptions,
+  type CodexCliRunRequest,
+  type CodexCliRunner,
+} from './codex-cli-provider.js';
 
 export {
   parseToolCall,

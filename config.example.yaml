@@ -12,13 +12,17 @@ prompt:
   max_tokens: 8000
 
 # providers:
+#   - name: codex
+#     type: codex-cli
+#     command: codex
+#     default_model: gpt-5.5
 #   - name: openrouter
 #     type: openai-compatible
 #     base_url: https://openrouter.ai/api/v1
 #     api_key_env: OPENROUTER_API_KEY
-#     default_model: qwen/qwen3.6-plus-preview:free
-# default_provider: openrouter
-# default_model: qwen/qwen3.6-plus-preview:free
+#     default_model: openrouter/auto
+# default_provider: codex
+# default_model: gpt-5.5
 
 heartbeat:
   enabled: true

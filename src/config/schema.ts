@@ -4,11 +4,14 @@ import { z } from 'zod';
 
 export const ProviderProfileSchema = z.object({
   name: z.string(),
-  type: z.enum(['openai-compatible', 'anthropic', 'local']),
+  type: z.enum(['openai-compatible', 'anthropic', 'local', 'codex-cli']),
   base_url: z.string().optional(),
   api_key_env: z.string().optional(),
   api_key: z.string().optional(),
   default_model: z.string().optional(),
+  command: z.string().optional(),
+  cwd: z.string().optional(),
+  timeout_ms: z.number().optional(),
 });
 
 export type ProviderProfile = z.infer<typeof ProviderProfileSchema>;
