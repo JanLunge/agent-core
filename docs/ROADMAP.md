@@ -46,6 +46,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 6 daily continuity reader.
 - [x] Add Slice 7 working-memory selector.
 - [x] Add Slice 8 persona heap resolver.
+- [x] Add Slice 9 task block model.
 
 ## Active Slice Queue
 
@@ -140,7 +141,7 @@ Validation:
 
 Status: implemented in `src/heaper/persona-resolver.ts` with tests in `src/heaper/persona-resolver.test.ts`.
 
-### Slice 9 — Task block model
+### Slice 9 — Task block model ✅
 
 Goal: represent async/background work as Heaper-compatible task blocks with status, owner, origin session, and result links.
 
@@ -149,6 +150,8 @@ Validation:
 - transition to running/done/blocked;
 - link result blocks;
 - query resumable tasks.
+
+Status: implemented in `src/heaper/task-blocks.ts` with tests in `src/heaper/task-blocks.test.ts`.
 
 ### Slice 10 — Background continuation worker skeleton
 
