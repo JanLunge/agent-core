@@ -59,6 +59,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 19 Heaper-backed session store adapter.
 - [x] Add Slice 20 router persistence and route history.
 - [x] Add Slice 21 durable approval-request model.
+- [x] Add Slice 22 notification policy layer.
 
 ## Active Slice Queue
 
@@ -306,7 +307,7 @@ Validation:
 
 Status: implemented in `src/tools/approval-requests.ts` with tests in `src/tools/approval-requests.test.ts`.
 
-### Slice 22 — Notification policy layer
+### Slice 22 — Notification policy layer ✅
 
 Goal: centralize when the system should notify Jan versus stay quiet for live, async, heartbeat, and background modes.
 
@@ -315,6 +316,8 @@ Validation:
 - ordinary background progress stays silent;
 - live chat returns a direct response;
 - notification intents include concise reason and linked refs.
+
+Status: implemented in `src/notifications/policy.ts` with tests in `src/notifications/policy.test.ts`.
 
 ### Slice 23 — Error and blocker taxonomy
 
