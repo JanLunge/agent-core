@@ -47,6 +47,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 7 working-memory selector.
 - [x] Add Slice 8 persona heap resolver.
 - [x] Add Slice 9 task block model.
+- [x] Add Slice 10 background continuation worker skeleton.
 
 ## Active Slice Queue
 
@@ -153,7 +154,7 @@ Validation:
 
 Status: implemented in `src/heaper/task-blocks.ts` with tests in `src/heaper/task-blocks.test.ts`.
 
-### Slice 10 — Background continuation worker skeleton
+### Slice 10 — Background continuation worker skeleton ✅
 
 Goal: process resumable task blocks without depending on real cron or Heaper integration yet.
 
@@ -162,6 +163,8 @@ Validation:
 - skips blocked tasks;
 - writes progress/result blocks;
 - returns notification intent only for milestones/blockers.
+
+Status: implemented in `src/heartbeat/continuation-worker.ts` with tests in `src/heartbeat/continuation-worker.test.ts`.
 
 ### Slice 11 — Model routing policy types
 
