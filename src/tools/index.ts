@@ -38,6 +38,18 @@ export {
 } from './guard.js';
 
 export {
+  type ApprovalRequestData,
+  type ApprovalRequestStatus,
+  type CreateApprovalRequestBlockInput,
+  type DecideApprovalRequestInput,
+  type ApplyApprovalRequestInput,
+  type ProposedOperation,
+  createApprovalRequestBlock,
+  decideApprovalRequest,
+  markApprovalApplied,
+} from './approval-requests.js';
+
+export {
   type StoreToolOutputOptions,
   type StoredToolOutput,
   type ToolOutputBlockData,

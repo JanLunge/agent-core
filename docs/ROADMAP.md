@@ -58,6 +58,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 18 typed tool registry and execution boundary.
 - [x] Add Slice 19 Heaper-backed session store adapter.
 - [x] Add Slice 20 router persistence and route history.
+- [x] Add Slice 21 durable approval-request model.
 
 ## Active Slice Queue
 
@@ -293,7 +294,7 @@ Validation:
 
 Status: implemented in `src/router/route-history.ts` with tests in `src/router/route-history.test.ts`.
 
-### Slice 21 — Approval request model
+### Slice 21 — Approval request model ✅
 
 Goal: represent ask/approval decisions as durable approval-request blocks that can later be surfaced in UI or chat.
 
@@ -302,6 +303,8 @@ Validation:
 - request captures exact proposed operation;
 - approval/denial transitions are auditable;
 - applying approval resumes or unblocks the originating task/session.
+
+Status: implemented in `src/tools/approval-requests.ts` with tests in `src/tools/approval-requests.test.ts`.
 
 ### Slice 22 — Notification policy layer
 
