@@ -40,6 +40,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add local in-memory `HeaperMemory` scaffold with tests.
 - [x] Add Slice 1 session summary blocks linked to daily entries.
 - [x] Add Slice 2 normalized event type and chat/background factories.
+- [x] Add Slice 3 explicit router planning decisions.
 
 ## Active Slice Queue
 
@@ -65,7 +66,7 @@ Validation:
 
 Status: implemented in `src/events/normalized-event.ts` with tests in `src/events/normalized-event.test.ts`.
 
-### Slice 3 — Router planning decision
+### Slice 3 — Router planning decision ✅
 
 Goal: make the router produce an explicit decision before invoking the agent: session id, persona, mode, sensitivity, and model policy hint.
 
@@ -74,6 +75,8 @@ Validation:
 - addressed persona selects the persona heap;
 - sensitive input sets sensitive mode;
 - background input does not request live response by default.
+
+Status: implemented in `src/router/router.ts` with tests in `src/router/router.test.ts`.
 
 ### Slice 4 — Command guard boundary
 

@@ -2,6 +2,7 @@ import type { AgentRuntime } from '../agent/agent.js';
 import type { StreamChunk } from '../llm/types.js';
 import type { TurnResult } from '../conversation/loop.js';
 import type { ApprovalCallback } from '../tools/approval.js';
+import { createChatEvent, type EventModeHint, type EventSensitivity, type NormalizedEvent } from '../events/index.js';
 
 export interface IncomingMessage {
   channelType: string;
@@ -10,12 +11,34 @@ export interface IncomingMessage {
   sender?: string;
 }
 
+export type ModelPolicyHint = 'default' | 'local-required';
+
+export interface RoutingDecision {
+  eventId: string;
+  agentName: string;
+  persona?: string;
+  channelId: string;
+  sessionId: string;
+  mode: EventModeHint;
+  sensitivity: EventSensitivity;
+  modelPolicyHint: ModelPolicyHint;
+  respondLive: boolean;
+  reason: string;
+}
+
 export interface Router {
   registerAgent(name: string, agent: AgentRuntime): void;
   getAgent(name: string): AgentRuntime | undefined;
   listAgents(): Map<string, AgentRuntime>;
+  plan(message: IncomingMessage): RoutingDecision;
+  planEvent(event: NormalizedEvent): RoutingDecision;
   route(
     message: IncomingMessage,
+    onStream?: (chunk: StreamChunk) => void,
+    onApproval?: ApprovalCallback,
+  ): Promise<TurnResult>;
+  routeEvent(
+    event: NormalizedEvent,
     onStream?: (chunk: StreamChunk) => void,
     onApproval?: ApprovalCallback,
   ): Promise<TurnResult>;
@@ -33,21 +56,83 @@ export function createRouter(): Router {
   const bindings = new Map<string, string>(); // "channelType:chatId" → agent name
   let defaultAgentName: string | undefined;
 
+  function normalizeAgentName(name: string): string {
+    return name.trim().toLowerCase();
+  }
+
+  function resolveAgentName(event: NormalizedEvent): { agentName: string; reason: string } {
+    const explicitPersona = event.personaHint ? normalizeAgentName(event.personaHint) : undefined;
+    if (explicitPersona && agents.has(explicitPersona)) {
+      return { agentName: explicitPersona, reason: 'explicit-persona' };
+    }
+
+    const bindingKey = event.conversationKey ?? event.routing.channelId;
+    const boundAgent = bindingKey ? bindings.get(bindingKey) : undefined;
+    if (boundAgent) return { agentName: boundAgent, reason: 'existing-channel-binding' };
+
+    if (defaultAgentName) return { agentName: defaultAgentName, reason: 'default-agent' };
+
+    throw new Error('No agent registered to handle this event');
+  }
+
+  function planForEvent(event: NormalizedEvent): RoutingDecision {
+    const { agentName, reason } = resolveAgentName(event);
+    const agent = agents.get(agentName);
+    if (!agent) {
+      throw new Error(`Agent "${agentName}" not found`);
+    }
+
+    const channelId = event.conversationKey ?? event.routing.channelId ?? `${event.source}:${event.id}`;
+    const conversation = agent.getOrCreateConversation(channelId);
+    const modelPolicyHint: ModelPolicyHint = event.sensitivity === 'sensitive' ? 'local-required' : 'default';
+
+    if (event.source === 'chat' && event.modeHint === 'live') {
+      bindings.set(channelId, agentName);
+    }
+
+    return {
+      eventId: event.id,
+      agentName,
+      persona: event.personaHint,
+      channelId,
+      sessionId: conversation.id,
+      mode: event.modeHint,
+      sensitivity: event.sensitivity,
+      modelPolicyHint,
+      respondLive: event.modeHint === 'live',
+      reason,
+    };
+  }
+
   return {
     registerAgent(name: string, agent: AgentRuntime): void {
-      agents.set(name, agent);
+      const normalizedName = normalizeAgentName(name);
+      agents.set(normalizedName, agent);
       // First registered agent becomes the default if none is set
       if (!defaultAgentName) {
-        defaultAgentName = name;
+        defaultAgentName = normalizedName;
       }
     },
 
     getAgent(name: string): AgentRuntime | undefined {
-      return agents.get(name);
+      return agents.get(normalizeAgentName(name));
     },
 
     listAgents(): Map<string, AgentRuntime> {
       return new Map(agents);
+    },
+
+    plan(message: IncomingMessage): RoutingDecision {
+      return planForEvent(createChatEvent({
+        channelType: message.channelType,
+        chatId: message.chatId,
+        text: message.text,
+        sender: message.sender,
+      }));
+    },
+
+    planEvent(event: NormalizedEvent): RoutingDecision {
+      return planForEvent(event);
     },
 
     async route(
@@ -55,20 +140,25 @@ export function createRouter(): Router {
       onStream?: (chunk: StreamChunk) => void,
       onApproval?: ApprovalCallback,
     ): Promise<TurnResult> {
-      const bindingKey = `${message.channelType}:${message.chatId}`;
-      const agentName = bindings.get(bindingKey) ?? defaultAgentName;
+      return this.routeEvent(createChatEvent({
+        channelType: message.channelType,
+        chatId: message.chatId,
+        text: message.text,
+        sender: message.sender,
+      }), onStream, onApproval);
+    },
 
-      if (!agentName) {
-        throw new Error('No agent registered to handle this message');
-      }
-
-      const agent = agents.get(agentName);
+    async routeEvent(
+      event: NormalizedEvent,
+      onStream?: (chunk: StreamChunk) => void,
+      onApproval?: ApprovalCallback,
+    ): Promise<TurnResult> {
+      const decision = planForEvent(event);
+      const agent = agents.get(decision.agentName);
       if (!agent) {
-        throw new Error(`Agent "${agentName}" not found`);
+        throw new Error(`Agent "${decision.agentName}" not found`);
       }
-
-      const channelId = bindingKey;
-      return agent.processMessage(channelId, message.text, onStream, onApproval);
+      return agent.processMessage(decision.channelId, event.content, onStream, onApproval);
     },
 
     resetChannel(channelType: string, chatId: string): void {
@@ -82,10 +172,11 @@ export function createRouter(): Router {
     },
 
     setDefaultAgent(name: string): void {
-      if (!agents.has(name)) {
+      const normalizedName = normalizeAgentName(name);
+      if (!agents.has(normalizedName)) {
         throw new Error(`Cannot set default: agent "${name}" is not registered`);
       }
-      defaultAgentName = name;
+      defaultAgentName = normalizedName;
     },
   };
 }
