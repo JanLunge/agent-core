@@ -42,6 +42,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 2 normalized event type and chat/background factories.
 - [x] Add Slice 3 explicit router planning decisions.
 - [x] Add Slice 4 auditable command/file/API guard decisions.
+- [x] Add Slice 5 tool output blocks with bounded agent summaries.
 
 ## Active Slice Queue
 
@@ -91,7 +92,7 @@ Validation:
 
 Status: implemented in `src/tools/guard.ts` with tests in `src/tools/guard.test.ts`.
 
-### Slice 5 — Tool output blocks
+### Slice 5 — Tool output blocks ✅
 
 Goal: store full tool outputs as Heaper blocks and return bounded summaries/references to the agent.
 
@@ -100,6 +101,8 @@ Validation:
 - large output is stored and summarized;
 - full output can be retrieved by reference;
 - search within stored output works through memory API.
+
+Status: implemented in `src/tools/output-blocks.ts` with tests in `src/tools/output-blocks.test.ts`.
 
 ### Slice 6 — Daily continuity reader
 

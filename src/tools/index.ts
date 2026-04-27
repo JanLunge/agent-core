@@ -38,6 +38,14 @@ export {
 } from './guard.js';
 
 export {
+  type StoreToolOutputOptions,
+  type StoredToolOutput,
+  type ToolOutputBlockData,
+  getStoredToolOutput,
+  storeToolOutput,
+} from './output-blocks.js';
+
+export {
   type McpServerConfig,
   type McpToolDefinition,
   McpConnection,
