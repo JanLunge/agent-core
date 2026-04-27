@@ -54,6 +54,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 14 interface adapters as event factories.
 - [x] Add Slice 15 progress reporter.
 - [x] Add Slice 16 runtime orchestration skeleton.
+- [x] Add Slice 17 deterministic fake agent harness.
 
 ## Active Slice Queue
 
@@ -241,7 +242,7 @@ Validation:
 
 Status: implemented in `src/runtime/orchestrator.ts` with tests in `src/runtime/orchestrator.test.ts`.
 
-### Slice 17 — Deterministic fake agent harness
+### Slice 17 — Deterministic fake agent harness ✅
 
 Goal: add a fake model/agent harness for end-to-end tests so the runtime can validate behavior without external APIs.
 
@@ -250,6 +251,8 @@ Validation:
 - runtime handles a plain reply;
 - runtime handles a guarded tool denial;
 - tests are deterministic and do not require credentials.
+
+Status: implemented in `src/runtime/fake-agent.ts` with tests in `src/runtime/fake-agent.test.ts`.
 
 ### Slice 18 — Tool registry and execution boundary
 
