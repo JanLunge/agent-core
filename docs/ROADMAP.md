@@ -49,6 +49,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 9 task block model.
 - [x] Add Slice 10 background continuation worker skeleton.
 - [x] Add Slice 11 model routing policy types.
+- [x] Add Slice 12 sensitive-mode runtime enforcement.
 
 ## Active Slice Queue
 
@@ -178,7 +179,7 @@ Validation:
 
 Status: implemented in `src/llm/model-routing.ts` with tests in `src/llm/model-routing.test.ts`.
 
-### Slice 12 — Sensitive-mode enforcement tests
+### Slice 12 — Sensitive-mode enforcement tests ✅
 
 Goal: prove sensitive mode constrains model routing and tools at the runtime boundary, not via agent prompt instructions.
 
@@ -187,6 +188,8 @@ Validation:
 - local-only model required;
 - allowed local/read-only tools still work;
 - violations produce auditable denial reasons.
+
+Status: implemented in `src/runtime/sensitive-mode.ts` with tests in `src/runtime/sensitive-mode.test.ts`.
 
 ### Slice 13 — Proposal flow for human heap writes
 
