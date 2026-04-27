@@ -38,10 +38,12 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Define initial Heaper block/domain types.
 - [x] Define heap permission decisions for `human/*`, `agent/*`, and `persona/*`.
 - [x] Add local in-memory `HeaperMemory` scaffold with tests.
+- [x] Add Slice 1 session summary blocks linked to daily entries.
+- [x] Add Slice 2 normalized event type and chat/background factories.
 
 ## Active Slice Queue
 
-### Slice 1 — Session summary blocks
+### Slice 1 — Session summary blocks ✅
 
 Goal: connect existing conversation/session persistence to the Heaper-shaped memory layer without replacing storage wholesale.
 
@@ -50,7 +52,9 @@ Validation:
 - link it to a daily entry;
 - test that today's daily entry can retrieve the linked summary.
 
-### Slice 2 — Normalized event type
+Status: implemented in `src/conversation/session-summary.ts` with tests in `src/conversation/session-summary.test.ts`.
+
+### Slice 2 — Normalized event type ✅
 
 Goal: define the interface-layer event shape for chat, TUI, voice, API, and background triggers.
 
@@ -58,6 +62,8 @@ Validation:
 - construct events from at least chat and background inputs;
 - route sensitivity/mode/persona hints into typed fields;
 - test deterministic routing metadata extraction.
+
+Status: implemented in `src/events/normalized-event.ts` with tests in `src/events/normalized-event.test.ts`.
 
 ### Slice 3 — Router planning decision
 
