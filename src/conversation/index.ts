@@ -27,3 +27,10 @@ export {
   type WorkingMemoryBundle,
   selectWorkingMemory,
 } from './working-memory.js';
+export {
+  HeaperSessionStore,
+  type HeaperSessionData,
+  type HeaperSessionMessageData,
+  type HeaperSessionStoreOptions,
+  type HeaperSessionSummaryData,
+} from './heaper-session-store.js';

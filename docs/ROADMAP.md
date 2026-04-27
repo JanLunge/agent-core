@@ -56,6 +56,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 16 runtime orchestration skeleton.
 - [x] Add Slice 17 deterministic fake agent harness.
 - [x] Add Slice 18 typed tool registry and execution boundary.
+- [x] Add Slice 19 Heaper-backed session store adapter.
 
 ## Active Slice Queue
 
@@ -267,7 +268,7 @@ Validation:
 
 Status: implemented in `src/tools/boundary.ts` with tests in `src/tools/boundary.test.ts`.
 
-### Slice 19 — Session store adapter
+### Slice 19 — Session store adapter ✅
 
 Goal: provide a session store abstraction backed by HeaperMemory so sessions can be created, resumed, summarized, and searched consistently.
 
@@ -276,6 +277,8 @@ Validation:
 - append user/assistant/tool messages;
 - produce summary blocks;
 - retrieve recent slice independent of input surface.
+
+Status: implemented in `src/conversation/heaper-session-store.ts` with tests in `src/conversation/heaper-session-store.test.ts`.
 
 ### Slice 20 — Router persistence and route history
 
