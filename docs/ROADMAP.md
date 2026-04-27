@@ -44,6 +44,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 4 auditable command/file/API guard decisions.
 - [x] Add Slice 5 tool output blocks with bounded agent summaries.
 - [x] Add Slice 6 daily continuity reader.
+- [x] Add Slice 7 working-memory selector.
 
 ## Active Slice Queue
 
@@ -116,7 +117,7 @@ Validation:
 
 Status: implemented in `src/conversation/daily-continuity.ts` with tests in `src/conversation/daily-continuity.test.ts`.
 
-### Slice 7 — Session working-memory selector
+### Slice 7 — Session working-memory selector ✅
 
 Goal: combine recent session messages with relevant HeaperMemory retrieval into a bounded working-memory bundle.
 
@@ -124,6 +125,8 @@ Validation:
 - recent messages are preserved in order;
 - relevant search results are deduplicated;
 - token/size limits are applied deterministically.
+
+Status: implemented in `src/conversation/working-memory.ts` with tests in `src/conversation/working-memory.test.ts`.
 
 ### Slice 8 — Persona heap resolver
 

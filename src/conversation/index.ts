@@ -21,3 +21,9 @@ export {
   type ReadDailyContinuityOptions,
   readDailyContinuity,
 } from './daily-continuity.js';
+export {
+  type SelectWorkingMemoryOptions,
+  type WorkingMemoryBlock,
+  type WorkingMemoryBundle,
+  selectWorkingMemory,
+} from './working-memory.js';
