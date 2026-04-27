@@ -41,6 +41,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 1 session summary blocks linked to daily entries.
 - [x] Add Slice 2 normalized event type and chat/background factories.
 - [x] Add Slice 3 explicit router planning decisions.
+- [x] Add Slice 4 auditable command/file/API guard decisions.
 
 ## Active Slice Queue
 
@@ -78,7 +79,7 @@ Validation:
 
 Status: implemented in `src/router/router.ts` with tests in `src/router/router.test.ts`.
 
-### Slice 4 — Command guard boundary
+### Slice 4 — Command guard boundary ✅
 
 Goal: centralize allow/deny/ask decisions for shell, API, and file writes.
 
@@ -87,6 +88,8 @@ Validation:
 - asks for risky writes;
 - blocks external calls in sensitive mode;
 - emits auditable decision objects.
+
+Status: implemented in `src/tools/guard.ts` with tests in `src/tools/guard.test.ts`.
 
 ### Slice 5 — Tool output blocks
 

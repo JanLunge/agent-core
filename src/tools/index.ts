@@ -29,6 +29,15 @@ export {
 export { compactToolResult } from './compaction.js';
 
 export {
+  type GuardAction,
+  type GuardDecision,
+  type GuardDisposition,
+  type GuardRequest,
+  type GuardSurface,
+  decideGuard,
+} from './guard.js';
+
+export {
   type McpServerConfig,
   type McpToolDefinition,
   McpConnection,
