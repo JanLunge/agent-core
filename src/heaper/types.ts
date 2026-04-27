@@ -8,7 +8,7 @@
 
 export type HeapScope = 'human' | 'agent' | 'persona';
 export type HeapName = `human/${string}` | `agent/${string}` | `persona/${string}/${string}`;
-export type BlockType = 'text' | 'file' | 'metadata' | 'link' | 'session' | 'tool-output' | 'task' | 'daily-entry';
+export type BlockType = 'text' | 'file' | 'metadata' | 'link' | 'session' | 'tool-output' | 'task' | 'daily-entry' | 'proposal';
 
 export interface HeapRef {
   scope: HeapScope;

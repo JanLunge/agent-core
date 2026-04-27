@@ -50,6 +50,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 10 background continuation worker skeleton.
 - [x] Add Slice 11 model routing policy types.
 - [x] Add Slice 12 sensitive-mode runtime enforcement.
+- [x] Add Slice 13 human heap write proposal flow.
 
 ## Active Slice Queue
 
@@ -191,7 +192,7 @@ Validation:
 
 Status: implemented in `src/runtime/sensitive-mode.ts` with tests in `src/runtime/sensitive-mode.test.ts`.
 
-### Slice 13 — Proposal flow for human heap writes
+### Slice 13 — Proposal flow for human heap writes ✅
 
 Goal: agent attempts to mutate `human/*` become proposal blocks unless approval/pre-approved tags allow direct write.
 
@@ -199,6 +200,8 @@ Validation:
 - unapproved write creates proposal;
 - approved write applies update;
 - proposal links target block and originating session/task.
+
+Status: implemented in `src/heaper/human-proposals.ts` with tests in `src/heaper/human-proposals.test.ts`.
 
 ### Slice 14 — Interface adapters as event factories
 
