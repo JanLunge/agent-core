@@ -29,3 +29,15 @@ export { RateLimiter, createRateLimitedProvider } from './rate-limit.js';
 export { CostTracker, createCostTrackingProvider } from './cost.js';
 
 export { createFailoverProvider } from './failover.js';
+
+export {
+  type AvailableModel,
+  type ModelCapability,
+  type ModelRoutingDecision,
+  type ModelRoutingInput,
+  type ModelRoutingPolicy,
+  type ModelSensitivity,
+  type PersonaModelDefaults,
+  type TaskComplexity,
+  routeModel,
+} from './model-routing.js';

@@ -48,6 +48,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 8 persona heap resolver.
 - [x] Add Slice 9 task block model.
 - [x] Add Slice 10 background continuation worker skeleton.
+- [x] Add Slice 11 model routing policy types.
 
 ## Active Slice Queue
 
@@ -166,7 +167,7 @@ Validation:
 
 Status: implemented in `src/heartbeat/continuation-worker.ts` with tests in `src/heartbeat/continuation-worker.test.ts`.
 
-### Slice 11 — Model routing policy types
+### Slice 11 — Model routing policy types ✅
 
 Goal: define model-selection inputs/outputs around task type, persona, sensitivity, complexity, and availability.
 
@@ -174,6 +175,8 @@ Validation:
 - sensitive tasks require local model;
 - non-sensitive complex tasks can request stronger remote model;
 - persona defaults are respected.
+
+Status: implemented in `src/llm/model-routing.ts` with tests in `src/llm/model-routing.test.ts`.
 
 ### Slice 12 — Sensitive-mode enforcement tests
 
