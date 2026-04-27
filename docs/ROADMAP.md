@@ -51,6 +51,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 11 model routing policy types.
 - [x] Add Slice 12 sensitive-mode runtime enforcement.
 - [x] Add Slice 13 human heap write proposal flow.
+- [x] Add Slice 14 interface adapters as event factories.
 
 ## Active Slice Queue
 
@@ -203,7 +204,7 @@ Validation:
 
 Status: implemented in `src/heaper/human-proposals.ts` with tests in `src/heaper/human-proposals.test.ts`.
 
-### Slice 14 — Interface adapters as event factories
+### Slice 14 — Interface adapters as event factories ✅
 
 Goal: normalize chat/TUI/API/background input into the same event shape without invoking the full runtime.
 
@@ -211,6 +212,8 @@ Validation:
 - each adapter produces equivalent core fields;
 - surface-specific metadata is preserved separately;
 - routing is independent of input surface.
+
+Status: implemented in `src/events/adapters.ts` with tests in `src/events/adapters.test.ts`.
 
 ### Slice 15 — Progress reporter
 
