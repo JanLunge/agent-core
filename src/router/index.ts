@@ -5,3 +5,11 @@ export {
   type RoutingDecision,
   createRouter,
 } from './router.js';
+export {
+  type QueryRouteHistoryInput,
+  type RouteRecordData,
+  type StoreRouteDecisionInput,
+  explainRouteHistory,
+  queryRouteHistory,
+  storeRouteDecision,
+} from './route-history.js';

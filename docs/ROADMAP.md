@@ -57,6 +57,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 17 deterministic fake agent harness.
 - [x] Add Slice 18 typed tool registry and execution boundary.
 - [x] Add Slice 19 Heaper-backed session store adapter.
+- [x] Add Slice 20 router persistence and route history.
 
 ## Active Slice Queue
 
@@ -280,7 +281,7 @@ Validation:
 
 Status: implemented in `src/conversation/heaper-session-store.ts` with tests in `src/conversation/heaper-session-store.test.ts`.
 
-### Slice 20 — Router persistence and route history
+### Slice 20 — Router persistence and route history ✅
 
 Goal: persist routing decisions as blocks so later agents can explain why a conversation went to a session/persona/mode.
 
@@ -289,6 +290,8 @@ Validation:
 - repeated channel/session routing is explainable from history;
 - sensitive/model/persona decisions are queryable;
 - route records are bounded and do not copy full private context.
+
+Status: implemented in `src/router/route-history.ts` with tests in `src/router/route-history.test.ts`.
 
 ### Slice 21 — Approval request model
 
