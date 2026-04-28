@@ -61,6 +61,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 21 durable approval-request model.
 - [x] Add Slice 22 notification policy layer.
 - [x] Add Slice 23 error and blocker taxonomy.
+- [x] Add Slice 24 local durable HeaperMemory storage adapter.
 
 ## Active Slice Queue
 
@@ -332,7 +333,7 @@ Validation:
 
 Status: implemented in `src/runtime/blockers.ts` with tests in `src/runtime/blockers.test.ts`; progress reporting accepts active blocker summaries.
 
-### Slice 24 — Local durable storage adapter
+### Slice 24 — Local durable storage adapter ✅
 
 Goal: add a simple durable local storage implementation for HeaperMemory semantics, likely file-backed JSONL or SQLite, while preserving the future Heaper interface.
 
@@ -341,6 +342,8 @@ Validation:
 - links and daily entries round-trip;
 - search/filter behavior matches in-memory scaffold fixtures;
 - no destructive migration of existing data is required.
+
+Status: implemented in `src/heaper/local-storage.ts` with tests in `src/heaper/local-storage.test.ts`.
 
 ### Slice 25 — Heaper adapter contract tests
 
