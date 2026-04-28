@@ -66,6 +66,16 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 26 persona configuration loader.
 - [x] Add Slice 27 delegation/reference workflow.
 - [x] Add Slice 28 end-to-end smoke scenario.
+- [ ] Add Slice 29 runtime CLI smoke command.
+- [ ] Add Slice 30 LocalHeaperMemory runtime wiring.
+- [ ] Add Slice 31 route/session store integration in orchestrator.
+- [ ] Add Slice 32 approval request integration in tool boundary.
+- [ ] Add Slice 33 notification intents in runtime outcome.
+- [ ] Add Slice 34 blocker persistence on runtime failures.
+- [ ] Add Slice 35 persona config integration into router/model defaults.
+- [ ] Add Slice 36 background worker uses LocalHeaperMemory.
+- [ ] Add Slice 37 daily continuity writes from completed runtime turns.
+- [ ] Add Slice 38 real-run audit export command.
 
 ## Active Slice Queue
 
@@ -396,6 +406,106 @@ Validation:
 - progress reporter can summarize the run.
 
 Status: implemented in `src/runtime/e2e-smoke.test.ts`.
+
+### Slice 29 — Runtime CLI smoke command
+
+Goal: add a local CLI command that exercises the deterministic runtime smoke path without external services.
+
+Validation:
+- command accepts a message and persona hint;
+- uses fake agent/model fixtures only;
+- writes event/route/session/audit/tool-output blocks to a temp or configured local store;
+- prints linked refs and concise reply.
+
+### Slice 30 — LocalHeaperMemory runtime wiring
+
+Goal: make runtime scaffolding able to use `LocalHeaperMemory` through configuration rather than test-only constructors.
+
+Validation:
+- config selects in-memory or local durable memory;
+- local path is created safely if missing;
+- existing storage is loaded without migration/destruction;
+- runtime smoke can be run twice and see prior blocks.
+
+### Slice 31 — Route/session store integration in orchestrator
+
+Goal: replace ad-hoc session message writes in the orchestrator with `HeaperSessionStore` and route history helpers.
+
+Validation:
+- runtime persists route records via `storeRouteDecision`;
+- session create/resume uses `HeaperSessionStore`;
+- user/assistant/tool messages remain linked to event/route/model/tool refs;
+- existing orchestrator/e2e tests still pass.
+
+### Slice 32 — Approval request integration in tool boundary
+
+Goal: when guarded tool execution returns `ask`, create a durable approval-request block rather than only returning a skipped result.
+
+Validation:
+- ask decisions create approval request refs with exact proposed operation;
+- deny decisions remain denials without approval blocks;
+- allow decisions execute normally;
+- approval refs link intent, guard decision, session/task origin refs.
+
+### Slice 33 — Notification intents in runtime outcome
+
+Goal: have runtime/orchestrator produce notification intents using the notification policy instead of leaving callers to infer chat vs background behavior.
+
+Validation:
+- live chat yields direct-response intent;
+- background ordinary progress stays silent;
+- blockers/approval requests request notification;
+- intents include reason and refs.
+
+### Slice 34 — Blocker persistence on runtime failures
+
+Goal: convert runtime/tool/model failures into durable blocker blocks so work can resume instead of losing exceptions.
+
+Validation:
+- model unavailable creates missing-credential or tool-failure blocker as appropriate;
+- denied permission can become blocked task/session state;
+- blocker refs appear in progress reports;
+- sensitive details are redacted.
+
+### Slice 35 — Persona config integration into router/model defaults
+
+Goal: feed loaded persona config into routing, heap selection, and model defaults deterministically.
+
+Validation:
+- explicit persona loads config before route/model decision;
+- persona default heaps select session/tool/memory heaps;
+- persona model defaults affect model routing;
+- invalid config fails closed with a blocker/diagnostic.
+
+### Slice 36 — Background worker uses LocalHeaperMemory
+
+Goal: allow the continuation worker to process durable local task blocks across process restarts.
+
+Validation:
+- pending task survives restart and is processed;
+- result/progress blocks are linked to task;
+- notification policy controls whether Jan is interrupted;
+- blocked tasks persist blocker refs.
+
+### Slice 37 — Daily continuity writes from completed runtime turns
+
+Goal: write concise daily continuity entries or linked summaries after completed runtime turns.
+
+Validation:
+- completed live/async turn appends a bounded daily entry;
+- daily entry links session/route/result refs;
+- repeated turns append without deleting prior content;
+- sensitive content is summarized or ref-linked safely.
+
+### Slice 38 — Real-run audit export command
+
+Goal: add a local inspection command that exports a readable audit trail for a session/task from linked Heaper blocks.
+
+Validation:
+- export starts from session/task ref;
+- includes event, route, model, guard, approval, tool, blocker, and result refs when linked;
+- redacts sensitive blocker/credential details;
+- output is deterministic for tests.
 
 ## Reporting Template
 
