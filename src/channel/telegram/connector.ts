@@ -1,8 +1,12 @@
-import { Bot, type Context } from 'grammy';
+import { randomUUID } from 'node:crypto';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { dirname } from 'node:path';
+import { Bot, InlineKeyboard, type Context } from 'grammy';
 import type { Router, IncomingMessage } from '../../router/router.js';
 import type { StreamChunk } from '../../llm/types.js';
 import type { ApprovalResult } from '../../tools/approval.js';
 import { escapeMarkdownV2, splitMessage } from './format.js';
+import { parseDirectFileWriteIntent, type DirectFileWriteIntent } from './direct-intents.js';
 
 export interface TelegramConnectorOptions {
   token: string;
@@ -18,6 +22,7 @@ export class TelegramConnector {
   private router: Router;
   private allowedUsers: Set<number> | undefined;
   private allowedGroups: Set<number> | undefined;
+  private pendingFileApprovals = new Map<string, DirectFileWriteIntent>();
 
   constructor(options: TelegramConnectorOptions) {
     this.bot = new Bot(options.token);
@@ -30,6 +35,7 @@ export class TelegramConnector {
       : undefined;
 
     this.setupHandlers();
+    this.setupApprovalHandlers();
   }
 
   // ---------------------------------------------------------------------------
@@ -92,14 +98,20 @@ export class TelegramConnector {
       const text = this.stripBotMention(ctx.message.text);
       if (!text.trim()) return;
 
-      const incoming: IncomingMessage = {
-        channelType: 'telegram',
-        chatId: String(ctx.chat.id),
-        text,
-        sender: ctx.from?.username ?? ctx.from?.first_name,
-      };
-
       try {
+        const directIntent = parseDirectFileWriteIntent(text);
+        if (directIntent) {
+          await this.requestFileWriteApproval(ctx, directIntent);
+          return;
+        }
+
+        const incoming: IncomingMessage = {
+          channelType: 'telegram',
+          chatId: String(ctx.chat.id),
+          text,
+          sender: ctx.from?.username ?? ctx.from?.first_name,
+        };
+
         await this.handleMessage(ctx, incoming);
       } catch (err) {
         console.error('[telegram] Error handling message:', err);
@@ -108,10 +120,60 @@ export class TelegramConnector {
     });
   }
 
+  private setupApprovalHandlers(): void {
+    this.bot.callbackQuery(/^file-write:(approve|deny):(.+)$/, async (ctx) => {
+      if (!this.isAuthorised(ctx)) return;
+      const action = ctx.match[1];
+      const id = ctx.match[2];
+      const intent = this.pendingFileApprovals.get(id);
+      if (!intent) {
+        await ctx.answerCallbackQuery({ text: 'Approval request expired or already handled.' }).catch(() => {});
+        return;
+      }
+      this.pendingFileApprovals.delete(id);
+
+      if (action === 'deny') {
+        await ctx.answerCallbackQuery({ text: 'Denied.' }).catch(() => {});
+        await ctx.editMessageText(`Denied: ${intent.description}\n${intent.path}`).catch(() => {});
+        return;
+      }
+
+      await ctx.answerCallbackQuery({ text: 'Approved.' }).catch(() => {});
+      try {
+        await mkdir(dirname(intent.path), { recursive: true });
+        await writeFile(intent.path, intent.content, 'utf8');
+        await ctx.editMessageText(`Approved and created:\n${intent.path}`).catch(async () => {
+          await ctx.reply(`Approved and created:\n${intent.path}`);
+        });
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        await ctx.editMessageText(`Approved, but file write failed:\n${message}`).catch(async () => {
+          await ctx.reply(`Approved, but file write failed:\n${message}`);
+        });
+      }
+    });
+  }
+
   private stripBotMention(text: string): string {
     const username = this.bot.botInfo?.username;
     if (!username) return text;
     return text.replace(new RegExp(`@${username}\\b`, 'g'), '').trim();
+  }
+
+  private async requestFileWriteApproval(ctx: Context, intent: DirectFileWriteIntent): Promise<void> {
+    const id = randomUUID();
+    this.pendingFileApprovals.set(id, intent);
+    const keyboard = new InlineKeyboard()
+      .text('Approve', `file-write:approve:${id}`)
+      .text('Deny', `file-write:deny:${id}`);
+
+    await ctx.reply([
+      'Permission needed:',
+      intent.description,
+      intent.path,
+      '',
+      'Approve this file write?',
+    ].join('\n'), { reply_markup: keyboard });
   }
 
   // ---------------------------------------------------------------------------
