@@ -29,13 +29,13 @@ describe('runRuntimeSmoke', () => {
       `Store: ${storePath}`,
       'Reply: smoke:mira:@mira check deterministic path',
       'Event: agent/audit#smoke-1',
-      'Route: agent/audit#smoke-2',
-      'Model: agent/audit#smoke-3 (remote/default)',
-      'User message: persona/mira/sessions#smoke-4',
-      'Assistant message: persona/mira/sessions#smoke-5',
-      'Tool intent: agent/audit#smoke-6',
-      'Guard decision: agent/audit#smoke-7 (allow)',
-      'Tool output: persona/mira/tool-output#smoke-8',
+      'Route: agent/audit#smoke-3',
+      'Model: agent/audit#smoke-4 (remote/default)',
+      'User message: persona/mira/sessions#smoke-5',
+      'Assistant message: persona/mira/sessions#smoke-6',
+      'Tool intent: agent/audit#smoke-7',
+      'Guard decision: agent/audit#smoke-8 (allow)',
+      'Tool output: persona/mira/tool-output#smoke-9',
     ]);
 
     const memory = new LocalHeaperMemory({ filePath: storePath, idPrefix: 'unused' });
@@ -43,12 +43,12 @@ describe('runRuntimeSmoke', () => {
       tags: ['runtime-event', 'source:chat', 'mode:live'],
     });
     await expect(memory.getBlock(result.refs.route)).resolves.toMatchObject({
-      tags: ['route-decision', 'agent:mira', 'mode:live', 'sensitivity:normal'],
-      links: [result.refs.event],
+      tags: expect.arrayContaining(['route-record', 'agent:mira', 'mode:live', 'sensitivity:normal']),
+      links: [result.refs.event, { heap: 'persona/mira/sessions', id: 'smoke-2' }],
     });
     await expect(memory.getBlock(result.refs.assistantMessage)).resolves.toMatchObject({
       data: { role: 'assistant', content: 'smoke:mira:@mira check deterministic path' },
-      links: [result.refs.userMessage, result.refs.route, result.refs.model],
+      links: [{ heap: 'persona/mira/sessions', id: 'smoke-2' }, result.refs.userMessage, result.refs.route, result.refs.model],
     });
     await expect(memory.getBlock(result.refs.toolIntent)).resolves.toMatchObject({
       links: [result.refs.event, result.refs.route, result.refs.assistantMessage],
@@ -73,7 +73,7 @@ describe('runRuntimeSmoke', () => {
     const second = await runRuntimeSmoke({ message: 'second', memoryConfig: { kind: 'local', path: storePath, id_prefix: 'cfg' } });
 
     expect(first.refs.event.id).toBe('cfg-1');
-    expect(second.refs.event.id).toBe('cfg-9');
+    expect(second.refs.event.id).toBe('cfg-10');
     const memory = new LocalHeaperMemory({ filePath: storePath, idPrefix: 'unused' });
     const messages = await memory.search('first', { heaps: ['persona/mira/sessions'], tags: ['session-message'] });
     expect(messages.map((block) => block.data.content)).toContain('@mira first');

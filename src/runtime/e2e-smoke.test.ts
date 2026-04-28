@@ -78,18 +78,21 @@ describe('end-to-end runtime smoke scenario', () => {
     expect(outcome.route).toMatchObject({ agentName: 'mira', sessionId: 'mira-1', sensitivity: 'normal' });
     expect(outcome.model).toMatchObject({ model: 'remote/default', requirement: 'default' });
     expect(tool.guardDecision.disposition).toBe('allow');
-    expect(tool.resultRef).toEqual({ heap: 'persona/mira/tool-output', id: 'smoke-8' });
+    expect(tool.resultRef).toEqual({ heap: 'persona/mira/tool-output', id: 'smoke-9' });
 
     await expect(memory.getBlock(outcome.eventRef)).resolves.toMatchObject({ tags: ['runtime-event', 'source:chat', 'mode:live'] });
-    await expect(memory.getBlock(outcome.routeRef)).resolves.toMatchObject({ links: [outcome.eventRef] });
+    await expect(memory.getBlock(outcome.routeRef)).resolves.toMatchObject({
+      tags: expect.arrayContaining(['route-record', 'agent:mira', 'mode:live', 'sensitivity:normal']),
+      links: [outcome.eventRef, { heap: 'persona/mira/sessions', id: 'smoke-2' }],
+    });
     await expect(memory.getBlock(outcome.userMessageRef)).resolves.toMatchObject({
       heap: 'persona/mira/sessions',
       data: { role: 'user', content: '@mira summarize local status', sessionId: 'mira-1' },
-      links: [outcome.eventRef, outcome.routeRef],
+      links: [{ heap: 'persona/mira/sessions', id: 'smoke-2' }, outcome.eventRef, outcome.routeRef],
     });
     await expect(memory.getBlock(outcome.assistantMessageRef)).resolves.toMatchObject({
       data: { role: 'assistant', content: 'smoke:@mira summarize local status' },
-      links: [outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef],
+      links: [{ heap: 'persona/mira/sessions', id: 'smoke-2' }, outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef],
     });
     await expect(memory.getBlock(tool.toolIntentRef)).resolves.toMatchObject({ links: [outcome.eventRef, outcome.routeRef, outcome.assistantMessageRef] });
     await expect(getStoredToolOutput(memory, tool.resultRef!)).resolves.toMatchObject({
@@ -106,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 29 — Runtime CLI smoke command');
-    expect(report.text).toContain('Active slice: Slice 30 — LocalHeaperMemory runtime wiring');
+    expect(report.text).toContain('Completed slice: Slice 30 — LocalHeaperMemory runtime wiring');
+    expect(report.text).toContain('Active slice: Slice 31 — Route/session store integration in orchestrator');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {
@@ -141,7 +144,7 @@ describe('end-to-end runtime smoke scenario', () => {
       links: [outcome.eventRef, outcome.routeRef],
     });
     await expect(memory.getBlock(outcome.assistantMessageRef)).resolves.toMatchObject({
-      links: [outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef, outcome.guardDecisionRefs[0]],
+      links: [{ heap: 'persona/mira/sessions', id: 'smoke-2' }, outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef, outcome.guardDecisionRefs[0]],
     });
   });
 });

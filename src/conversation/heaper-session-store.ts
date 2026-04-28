@@ -59,7 +59,7 @@ export class HeaperSessionStore {
     return hits[0] as HeaperBlock<HeaperSessionData> | undefined;
   }
 
-  async appendMessage(sessionId: string, message: Message): Promise<HeaperBlock<HeaperSessionMessageData>> {
+  async appendMessage(sessionId: string, message: Message, links: BlockRef[] = []): Promise<HeaperBlock<HeaperSessionMessageData>> {
     const session = await this.getSession(sessionId);
     if (!session) throw new Error(`Session not found: ${sessionId}`);
 
@@ -75,7 +75,7 @@ export class HeaperSessionStore {
         toolCallId: message.tool_call_id,
       },
       tags: ['session-message', `session:${sessionId}`, `role:${message.role}`],
-      links: [refFor(session)],
+      links: dedupeRefs([refFor(session), ...links]),
     })) as HeaperBlock<HeaperSessionMessageData>;
   }
 
@@ -147,4 +147,14 @@ function preview(content: string, maxLength = 160): string {
 
 function refFor(block: HeaperBlock): BlockRef {
   return { heap: block.heap, id: block.id };
+}
+
+function dedupeRefs(refs: BlockRef[]): BlockRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref) => {
+    const key = `${ref.heap}#${ref.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }

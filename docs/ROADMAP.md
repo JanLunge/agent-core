@@ -68,7 +68,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 28 end-to-end smoke scenario.
 - [x] Add Slice 29 runtime CLI smoke command.
 - [x] Add Slice 30 LocalHeaperMemory runtime wiring.
-- [ ] Add Slice 31 route/session store integration in orchestrator.
+- [x] Add Slice 31 route/session store integration in orchestrator.
 - [ ] Add Slice 32 approval request integration in tool boundary.
 - [ ] Add Slice 33 notification intents in runtime outcome.
 - [ ] Add Slice 34 blocker persistence on runtime failures.
@@ -431,7 +431,7 @@ Validation:
 
 Status: implemented in `src/runtime/memory-config.ts` with tests in `src/runtime/memory-config.test.ts`; `runtime_memory` config now selects in-memory or local durable storage.
 
-### Slice 31 — Route/session store integration in orchestrator
+### Slice 31 — Route/session store integration in orchestrator ✅
 
 Goal: replace ad-hoc session message writes in the orchestrator with `HeaperSessionStore` and route history helpers.
 
@@ -440,6 +440,8 @@ Validation:
 - session create/resume uses `HeaperSessionStore`;
 - user/assistant/tool messages remain linked to event/route/model/tool refs;
 - existing orchestrator/e2e tests still pass.
+
+Status: implemented in `src/runtime/orchestrator.ts`; runtime now creates/resumes sessions through `HeaperSessionStore`, persists route records via `storeRouteDecision`, and links session messages through the session block plus event/route/model/guard refs.
 
 ### Slice 32 — Approval request integration in tool boundary
 

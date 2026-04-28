@@ -65,10 +65,10 @@ describe('runRuntimeEvent', () => {
     expect(outcome.route).toMatchObject({ agentName: 'mira', sessionId: 'mira-1', channelId: 'telegram:jan' });
     expect(outcome.model).toMatchObject({ model: 'remote/default', requirement: 'default' });
     expect(outcome.eventRef).toEqual({ heap: 'agent/audit', id: 'block-1' });
-    expect(outcome.routeRef).toEqual({ heap: 'agent/audit', id: 'block-2' });
-    expect(outcome.modelDecisionRef).toEqual({ heap: 'agent/audit', id: 'block-3' });
-    expect(outcome.userMessageRef).toEqual({ heap: 'agent/sessions', id: 'block-4' });
-    expect(outcome.assistantMessageRef).toEqual({ heap: 'agent/sessions', id: 'block-5' });
+    expect(outcome.routeRef).toEqual({ heap: 'agent/audit', id: 'block-3' });
+    expect(outcome.modelDecisionRef).toEqual({ heap: 'agent/audit', id: 'block-4' });
+    expect(outcome.userMessageRef).toEqual({ heap: 'agent/sessions', id: 'block-5' });
+    expect(outcome.assistantMessageRef).toEqual({ heap: 'agent/sessions', id: 'block-6' });
   });
 
   it('writes session messages and auditable decision blocks to the configured heaps', async () => {
@@ -89,19 +89,20 @@ describe('runRuntimeEvent', () => {
     await expect(memory.getBlock(outcome.userMessageRef)).resolves.toMatchObject({
       heap: 'persona/mira/sessions',
       type: 'text',
-      tags: ['session-message', 'role:user', 'session:mira-1'],
-      data: { role: 'user', content: 'hello', sessionId: 'mira-1', channelId: 'signal:jan' },
-      links: [outcome.eventRef, outcome.routeRef],
+      tags: ['session-message', 'session:mira-1', 'role:user'],
+      data: { role: 'user', content: 'hello', sessionId: 'mira-1' },
+      links: [{ heap: 'persona/mira/sessions', id: 'block-2' }, outcome.eventRef, outcome.routeRef],
     });
     await expect(memory.getBlock(outcome.assistantMessageRef)).resolves.toMatchObject({
       heap: 'persona/mira/sessions',
-      tags: ['session-message', 'role:assistant', 'session:mira-1'],
-      links: [outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef],
+      tags: ['session-message', 'session:mira-1', 'role:assistant'],
+      links: [{ heap: 'persona/mira/sessions', id: 'block-2' }, outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef],
     });
     await expect(memory.getBlock(outcome.routeRef)).resolves.toMatchObject({
       heap: 'agent/audit',
       type: 'metadata',
-      tags: ['route-decision', 'agent:mira', 'mode:live', 'sensitivity:normal'],
+      tags: expect.arrayContaining(['route-record', 'agent:mira', 'mode:live', 'sensitivity:normal']),
+      links: [outcome.eventRef, { heap: 'persona/mira/sessions', id: 'block-2' }],
     });
   });
 
@@ -155,8 +156,8 @@ describe('runRuntimeEvent', () => {
     expect(outcome.model).toMatchObject({ model: 'local/small', requirement: 'local-required' });
     expect(outcome.guardDecisions.map((guard) => guard.disposition)).toEqual(['allow', 'deny']);
     expect(outcome.guardDecisionRefs).toEqual([
-      { heap: 'agent/audit', id: 'block-4' },
       { heap: 'agent/audit', id: 'block-5' },
+      { heap: 'agent/audit', id: 'block-6' },
     ]);
     await expect(memory.getBlock(outcome.guardDecisionRefs[1])).resolves.toMatchObject({
       tags: ['guard-decision', 'disposition:deny', 'surface:api'],

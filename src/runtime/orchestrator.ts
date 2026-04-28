@@ -1,9 +1,11 @@
 import type { NormalizedEvent } from '../events/index.js';
 import type { BlockRef, HeapName, HeaperBlock, HeaperMemory } from '../heaper/types.js';
 import { routeModel, type AvailableModel, type ModelRoutingDecision, type ModelRoutingPolicy, type TaskComplexity } from '../llm/model-routing.js';
+import { HeaperSessionStore } from '../conversation/heaper-session-store.js';
 import { selectWorkingMemory, type WorkingMemoryBundle } from '../conversation/working-memory.js';
 import type { Message } from '../llm/types.js';
 import type { Router, RoutingDecision } from '../router/router.js';
+import { storeRouteDecision } from '../router/route-history.js';
 import { decideGuard, type GuardDecision, type GuardRequest } from '../tools/guard.js';
 
 export interface RuntimeResponderInput {
@@ -61,12 +63,19 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
   });
 
   const route = input.router.planEvent(input.event);
-  const routeBlock = await input.memory.createBlock({
+  const sessionStore = new HeaperSessionStore({ memory: input.memory, sessionHeap: input.sessionHeap });
+  const sessionBlock = await sessionStore.createOrResume({
+    sessionId: route.sessionId,
+    agentName: route.agentName,
+    channelId: route.channelId,
+  });
+  const routeBlock = await storeRouteDecision({
+    memory: input.memory,
     heap: input.auditHeap,
-    type: 'metadata',
-    data: { route },
-    tags: ['route-decision', `agent:${route.agentName}`, `mode:${route.mode}`, `sensitivity:${route.sensitivity}`],
-    links: [refFor(eventBlock)],
+    event: input.event,
+    decision: route,
+    eventRef: refFor(eventBlock),
+    sessionRef: refFor(sessionBlock),
   });
 
   const history = [...(input.history ?? []), { role: 'user' as const, content: input.event.content, timestamp: input.event.receivedAt }];
@@ -108,33 +117,18 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     }));
   }
 
-  const userMessage = await input.memory.createBlock({
-    heap: input.sessionHeap,
-    type: 'text',
-    data: {
-      role: 'user',
-      content: input.event.content,
-      sessionId: route.sessionId,
-      channelId: route.channelId,
-      receivedAt: input.event.receivedAt,
-    },
-    tags: ['session-message', 'role:user', `session:${route.sessionId}`],
-    links: [refFor(eventBlock), refFor(routeBlock)],
-  });
+  const userMessage = await sessionStore.appendMessage(
+    route.sessionId,
+    { role: 'user', content: input.event.content, timestamp: input.event.receivedAt },
+    [refFor(eventBlock), refFor(routeBlock)],
+  );
 
   const reply = await (input.responder ?? defaultResponder)({ event: input.event, route, workingMemory, model, guardDecisions });
-  const assistantMessage = await input.memory.createBlock({
-    heap: input.sessionHeap,
-    type: 'text',
-    data: {
-      role: 'assistant',
-      content: reply,
-      sessionId: route.sessionId,
-      channelId: route.channelId,
-    },
-    tags: ['session-message', 'role:assistant', `session:${route.sessionId}`],
-    links: [refFor(userMessage), refFor(routeBlock), refFor(modelBlock), ...guardBlocks.map(refFor)],
-  });
+  const assistantMessage = await sessionStore.appendMessage(
+    route.sessionId,
+    { role: 'assistant', content: reply },
+    [refFor(userMessage), refFor(routeBlock), refFor(modelBlock), ...guardBlocks.map(refFor)],
+  );
 
   return {
     eventRef: refFor(eventBlock),
