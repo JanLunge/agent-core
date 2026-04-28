@@ -128,6 +128,13 @@ export class TelegramConnector {
     let accumulated = '';
     let lastEditedText = '';
     let editTimer: ReturnType<typeof setInterval> | undefined;
+    let typingTimer: ReturnType<typeof setInterval> | undefined;
+
+    const chatId = ctx.chat?.id;
+    const sendTyping = async () => {
+      if (chatId === undefined) return;
+      await ctx.api.sendChatAction(chatId, 'typing').catch(() => {});
+    };
 
     const flushEdit = async () => {
       const snapshot = accumulated;
@@ -152,7 +159,10 @@ export class TelegramConnector {
       }
     };
 
-    // Start a timer to periodically edit the placeholder with streamed text
+    // Start timers to periodically edit streamed text and keep Telegram's
+    // native "typing…" indicator alive while the agent is working.
+    await sendTyping();
+    typingTimer = setInterval(() => { void sendTyping(); }, 4_000);
     editTimer = setInterval(flushEdit, 500);
 
     // TODO: Telegram approval flow with inline keyboards comes in Phase 3.
@@ -162,9 +172,13 @@ export class TelegramConnector {
     try {
       const result = await this.router.route(message, onStream, onApproval);
 
-      // Stop the streaming edit timer
+      // Stop progress indicators before sending the final response.
       clearInterval(editTimer);
       editTimer = undefined;
+      if (typingTimer) {
+        clearInterval(typingTimer);
+        typingTimer = undefined;
+      }
 
       const finalText = result.reply || '(no response)';
 
@@ -198,6 +212,7 @@ export class TelegramConnector {
       }
     } finally {
       if (editTimer) clearInterval(editTimer);
+      if (typingTimer) clearInterval(typingTimer);
     }
   }
 
