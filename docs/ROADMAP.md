@@ -82,7 +82,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 42 task-to-runtime continuation bridge.
 - [x] Add Slice 43 persona daily continuity startup injection.
 - [x] Add Slice 44 route handoff scoring notes and scaffold.
-- [ ] Add Slice 45 durable notification outbox blocks.
+- [x] Add Slice 45 durable notification outbox blocks.
 - [ ] Add Slice 46 local audit compaction/snapshot command.
 - [ ] Add Slice 47 runtime health/status command over local memory.
 - [ ] Add Slice 48 Heaper adapter migration checklist and contract gaps.
@@ -603,7 +603,7 @@ Validation:
 
 Status: implemented in `src/router/router.ts` and `src/router/route-history.ts`; route decisions now carry candidate scores and reasons, explicit persona matches outrank sticky bindings/defaults, deterministic score/name ordering is covered by tests, and top candidates are stored as durable route metadata/tags.
 
-### Slice 45 — Durable notification outbox blocks
+### Slice 45 — Durable notification outbox blocks ✅
 
 Goal: persist notification intents before delivery so interruptions are auditable and retryable.
 
@@ -611,6 +611,8 @@ Validation:
 - runtime/worker intents can be stored as outbox blocks;
 - delivery state transitions are explicit;
 - silent intents are optionally summarized but not delivered.
+
+Status: implemented in `src/notifications/outbox.ts`; notification intents can be persisted as `notification-outbox` blocks, queued/summarized/delivered/failed/cancelled states are explicit, refs are linked for audit, and silent intents are summarized rather than queued for delivery.
 
 ### Slice 46 — Local audit compaction/snapshot command
 
