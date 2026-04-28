@@ -43,6 +43,7 @@ const availableModels = [
 const sessionHeap = 'agent/sessions' as HeapName;
 const auditHeap = 'agent/audit' as HeapName;
 const outputHeap = 'agent/tool-output' as HeapName;
+const dailyHeap = 'agent/daily' as HeapName;
 
 export function createRuntimeTelegramSpikeRuntime(options: Omit<RuntimeTelegramSpikeOptions, 'token' | 'allowedUsers'>): RuntimeTelegramSpikeRuntime {
   const selection = createRuntimeMemory({
@@ -73,6 +74,7 @@ export function createRuntimeTelegramSpikeRuntime(options: Omit<RuntimeTelegramS
         modelPolicy,
         availableModels,
         guardRequests: guardRequestsFor(input.text),
+        dailyHeap,
         responder: ({ event, route, workingMemory, guardDecisions }) => renderConversationalAnswer({
           text: event.content,
           agentName: route.agentName,

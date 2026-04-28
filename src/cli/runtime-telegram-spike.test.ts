@@ -60,5 +60,6 @@ describe('runtime telegram spike', () => {
     expect(persisted.blocks.some((block) => block.tags?.includes('route-record'))).toBe(true);
     expect(persisted.blocks.some((block) => block.tags?.includes('approval-request'))).toBe(true);
     expect(persisted.blocks.some((block) => block.tags?.includes('session-message'))).toBe(true);
+    expect(persisted.blocks.some((block) => block.tags?.includes('daily-entry'))).toBe(true);
   });
 });

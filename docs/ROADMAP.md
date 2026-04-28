@@ -76,7 +76,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 36 background worker uses LocalHeaperMemory.
 - [x] Add Slice 37 daily continuity writes from completed runtime turns.
 - [x] Add Slice 38 real-run audit export command.
-- [ ] Add Slice 39 runtime audit export CLI fixture for Telegram spike stores.
+- [x] Add Slice 39 runtime audit export CLI fixture for Telegram spike stores.
 - [ ] Add Slice 40 audit trail redaction policy tests for secret-like fields.
 - [ ] Add Slice 41 resumable approval application flow.
 - [ ] Add Slice 42 task-to-runtime continuation bridge.
@@ -537,7 +537,7 @@ Validation:
 
 Status: implemented in `src/cli/audit-export.ts`; `agent-core audit-export <heap#id> --store <path>` traverses linked and reverse-linked Heaper blocks, labels runtime audit artifacts, and redacts secret-like blocker data.
 
-### Slice 39 — Runtime audit export CLI fixture for Telegram spike stores
+### Slice 39 — Runtime audit export CLI fixture for Telegram spike stores ✅
 
 Goal: add a documented fixture/script that runs the audit exporter against a deterministic Telegram-spike-like LocalHeaperMemory store.
 
@@ -545,6 +545,8 @@ Validation:
 - fixture creates representative Telegram runtime blocks;
 - command output includes session, event, route, model, guard, approval, tool, blocker, daily refs;
 - docs show exact command and expected inspection pattern.
+
+Status: implemented in `src/cli/audit-export-fixture.ts`; `agent-core audit-export-fixture --store <path> --depth 6` creates deterministic Telegram-spike runtime turns, writes daily continuity, locates the persisted session ref, and prints both the rerunnable audit export command and the linked trail. Docs live in `docs/AUDIT-EXPORT.md`.
 
 ### Slice 40 — Audit trail redaction policy tests for secret-like fields
 

@@ -30,6 +30,7 @@ import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
 import { runRuntimeSmoke } from './runtime-smoke.js';
 import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
 import { runAuditExport } from './audit-export.js';
+import { renderTelegramAuditFixture, runTelegramAuditFixture } from './audit-export-fixture.js';
 
 const program = new Command();
 
@@ -292,6 +293,26 @@ program
       console.log(await runAuditExport({ storePath: resolve(opts.store), ref, maxDepth }));
     } catch (err) {
       console.error('Audit export failed:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('audit-export-fixture')
+  .description('Create a deterministic Telegram-spike-like runtime store and print its audit export command/output')
+  .option('-s, --store <path>', 'Local HeaperMemory JSON store path to create; defaults to a temp fixture store')
+  .option('-d, --depth <n>', 'Maximum link traversal depth', '6')
+  .action(async (opts: { store?: string; depth: string }) => {
+    try {
+      const maxDepth = Number.parseInt(opts.depth, 10);
+      if (!Number.isFinite(maxDepth) || maxDepth < 0) throw new Error(`Invalid depth: ${opts.depth}`);
+      const result = await runTelegramAuditFixture({
+        storePath: opts.store ? resolve(opts.store) : undefined,
+        maxDepth,
+      });
+      console.log(renderTelegramAuditFixture(result));
+    } catch (err) {
+      console.error('Audit export fixture failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
   });
