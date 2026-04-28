@@ -28,6 +28,7 @@ export class TelegramConnector {
   private allowedGroups: Set<number> | undefined;
   private operationApprovals = new OperationApprovalBroker();
   private pendingToolApprovalResolvers = new Map<string, (result: ApprovalResult) => void>();
+  private lastFileTargetsByChat = new Map<string, string>();
 
   constructor(options: TelegramConnectorOptions) {
     this.bot = new Bot(options.token);
@@ -104,8 +105,14 @@ export class TelegramConnector {
       if (!text.trim()) return;
 
       try {
-        const operation = parseDirectOperationIntent(text);
+        const chatKey = String(ctx.chat.id);
+        const operation = parseDirectOperationIntent(text, {
+          lastFileTarget: this.lastFileTargetsByChat.get(chatKey),
+        });
         if (operation) {
+          if (operation.kind === 'file.write' || operation.kind === 'file.delete') {
+            this.lastFileTargetsByChat.set(chatKey, operation.target);
+          }
           await this.requestOperationApproval(ctx, operation);
           return;
         }

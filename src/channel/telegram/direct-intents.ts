@@ -6,8 +6,16 @@ import type { OperationIntent } from '../../operations/approval.js';
  * Tiny deterministic bridge for early production testing while the full runtime
  * tool planner is being wired into normal Telegram operation.
  */
-export function parseDirectOperationIntent(text: string): OperationIntent | undefined {
-  return parseDirectFileDeleteIntent(text) ?? parseDirectFileWriteIntent(text);
+export interface DirectOperationIntentOptions {
+  /** Recent file target for contextual follow-ups like "delete it again". */
+  lastFileTarget?: string;
+}
+
+export function parseDirectOperationIntent(
+  text: string,
+  options: DirectOperationIntentOptions = {},
+): OperationIntent | undefined {
+  return parseDirectFileDeleteIntent(text, options) ?? parseDirectFileWriteIntent(text);
 }
 
 export function parseDirectFileWriteIntent(text: string): OperationIntent | undefined {
@@ -37,18 +45,26 @@ export function parseDirectFileWriteIntent(text: string): OperationIntent | unde
   };
 }
 
-export function parseDirectFileDeleteIntent(text: string): OperationIntent | undefined {
+export function parseDirectFileDeleteIntent(
+  text: string,
+  options: DirectOperationIntentOptions = {},
+): OperationIntent | undefined {
   const lower = text.trim().toLowerCase();
   if (!/\b(remove|delete|trash)\b/.test(lower)) return undefined;
 
   const explicitDesktop = /\bdesktop\b/.test(lower);
   const fileName = extractFileName(lower);
-  if (!fileName) return undefined;
+  const contextualDelete = /\b(it|that|this|again)\b/.test(lower);
+  const path = fileName
+    // For this early bridge, bare filenames are scoped to Desktop because the
+    // Telegram test flow creates and removes Desktop notes. Avoid arbitrary paths.
+    ? join(homedir(), 'Desktop', fileName)
+    : contextualDelete
+      ? options.lastFileTarget
+      : undefined;
+  if (!path) return undefined;
 
-  // For this early bridge, bare filenames are scoped to Desktop because the
-  // Telegram test flow creates and removes Desktop notes. Avoid arbitrary paths.
-  const path = join(homedir(), 'Desktop', fileName);
-  const location = explicitDesktop ? 'from the Desktop' : 'from the Desktop';
+  const location = explicitDesktop || path.startsWith(join(homedir(), 'Desktop')) ? 'from the Desktop' : 'from its current location';
 
   return {
     kind: 'file.delete',
@@ -64,7 +80,7 @@ function extractFileName(lower: string): string | undefined {
   if (explicit) return sanitizeFileName(explicit);
 
   const named = lower.match(/\b(?:remove|delete|trash)\s+(?:the\s+)?([a-z0-9][a-z0-9_-]*)\b/i)?.[1];
-  if (!named || ['note', 'file'].includes(named)) return undefined;
+  if (!named || ['note', 'file', 'it', 'that', 'this', 'again'].includes(named)) return undefined;
   return sanitizeFileName(`${named}.md`);
 }
 

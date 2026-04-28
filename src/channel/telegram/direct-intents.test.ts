@@ -33,6 +33,20 @@ describe('direct Telegram operation intents', () => {
     expect(parseDirectOperationIntent('remove the test-note.md from the desktop')).toMatchObject({ kind: 'file.delete' });
   });
 
+  it('uses recent file context for pronoun deletion follow-ups', () => {
+    expect(parseDirectOperationIntent('remove it again', {
+      lastFileTarget: join(homedir(), 'Desktop', 'a.md'),
+    })).toMatchObject({
+      kind: 'file.delete',
+      target: join(homedir(), 'Desktop', 'a.md'),
+      description: 'Move a.md from the Desktop to Trash',
+    });
+  });
+
+  it('does not delete pronouns without a recent file target', () => {
+    expect(parseDirectOperationIntent('remove it again')).toBeUndefined();
+  });
+
   it('ignores non-write chatter', () => {
     expect(parseDirectOperationIntent('what is on my desktop?')).toBeUndefined();
   });
