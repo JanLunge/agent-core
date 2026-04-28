@@ -63,6 +63,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 23 error and blocker taxonomy.
 - [x] Add Slice 24 local durable HeaperMemory storage adapter.
 - [x] Add Slice 25 Heaper adapter contract tests.
+- [x] Add Slice 26 persona configuration loader.
 
 ## Active Slice Queue
 
@@ -358,7 +359,7 @@ Validation:
 
 Status: implemented in `src/heaper/adapter-contract.test.ts` with a reusable `describeHeaperMemoryContract` helper covering both in-memory and local durable adapters.
 
-### Slice 26 — Persona configuration loader
+### Slice 26 — Persona configuration loader ✅
 
 Goal: load persona metadata/config from Heaper-compatible blocks or local files and feed it into routing, heap resolution, and model defaults.
 
@@ -367,6 +368,8 @@ Validation:
 - invalid config fails closed with useful diagnostics;
 - persona-private config is not exposed to other personas by default;
 - router can use loaded persona config deterministically.
+
+Status: implemented in `src/heaper/persona-config.ts` with tests in `src/heaper/persona-config.test.ts`.
 
 ### Slice 27 — Delegation/reference workflow
 
