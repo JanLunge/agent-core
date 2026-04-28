@@ -62,6 +62,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 22 notification policy layer.
 - [x] Add Slice 23 error and blocker taxonomy.
 - [x] Add Slice 24 local durable HeaperMemory storage adapter.
+- [x] Add Slice 25 Heaper adapter contract tests.
 
 ## Active Slice Queue
 
@@ -345,7 +346,7 @@ Validation:
 
 Status: implemented in `src/heaper/local-storage.ts` with tests in `src/heaper/local-storage.test.ts`.
 
-### Slice 25 — Heaper adapter contract tests
+### Slice 25 — Heaper adapter contract tests ✅
 
 Goal: extract shared conformance tests that any HeaperMemory implementation must pass, preparing for real Heaper integration later.
 
@@ -354,6 +355,8 @@ Validation:
 - durable local adapter passes conformance suite;
 - tests cover blocks, links, permissions-facing behavior, daily entries, search, and semantic slices;
 - future Heaper adapter can reuse the same suite.
+
+Status: implemented in `src/heaper/adapter-contract.test.ts` with a reusable `describeHeaperMemoryContract` helper covering both in-memory and local durable adapters.
 
 ### Slice 26 — Persona configuration loader
 
