@@ -2,6 +2,7 @@ import type { BlockRef, HeapName, HeaperBlock, HeaperMemory } from '../heaper/ty
 import type { GuardAction, GuardDecision, GuardRequest, GuardSurface } from './guard.js';
 import { decideGuard } from './guard.js';
 import type { ToolContext, ToolHandler } from './registry.js';
+import { createApprovalRequestBlock } from './approval-requests.js';
 import { storeToolOutput } from './output-blocks.js';
 import type { ToolResult } from './executor.js';
 
@@ -30,6 +31,7 @@ export interface ExecuteBoundaryToolInput {
   memory: HeaperMemory;
   auditHeap: HeapName;
   outputHeap: HeapName;
+  approvalHeap?: HeapName;
   toolName: string;
   args: Record<string, unknown>;
   context: ToolContext;
@@ -40,6 +42,7 @@ export interface ExecuteBoundaryToolInput {
 export interface BoundaryToolExecution {
   toolIntentRef: BlockRef;
   guardDecisionRef: BlockRef;
+  approvalRequestRef?: BlockRef;
   resultRef?: BlockRef;
   guardDecision: GuardDecision;
   result: ToolResult;
@@ -62,8 +65,9 @@ export function createBoundaryToolRegistry(): BoundaryToolRegistry {
 
 /**
  * Executes a typed local/internal tool only after a guard decision allows it.
- * Ask/deny decisions are recorded and returned as skipped results; allowed
- * output is stored as a Heaper `tool-output` block and linked to the audit trail.
+ * Ask decisions create durable approval-request blocks; deny decisions are
+ * recorded and returned as skipped results; allowed output is stored as a Heaper
+ * `tool-output` block and linked to the audit trail.
  */
 export async function executeBoundaryTool(input: ExecuteBoundaryToolInput): Promise<BoundaryToolExecution> {
   const tool = input.registry.get(input.toolName);
@@ -97,9 +101,22 @@ export async function executeBoundaryTool(input: ExecuteBoundaryToolInput): Prom
   });
 
   if (guardDecision.disposition !== 'allow') {
+    const approvalBlock = guardDecision.disposition === 'ask'
+      ? await createApprovalRequestBlock({
+        memory: input.memory,
+        heap: input.approvalHeap ?? input.auditHeap,
+        guardDecision,
+        requester: input.context.agentName,
+        originRefs: input.originRefs,
+        auditRefs: [refFor(intentBlock), refFor(guardBlock)],
+        args: input.args,
+      })
+      : undefined;
+
     return {
       toolIntentRef: refFor(intentBlock),
       guardDecisionRef: refFor(guardBlock),
+      approvalRequestRef: approvalBlock ? refFor(approvalBlock) : undefined,
       guardDecision,
       result: {
         toolCallId: tool.name,

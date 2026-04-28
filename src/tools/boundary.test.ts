@@ -57,6 +57,7 @@ describe('boundary tool registry and execution', () => {
 
     expect(called).toBe(false);
     expect(result.result).toMatchObject({ skipped: true, error: 'Sensitive mode blocks external/network operations.' });
+    expect(result.approvalRequestRef).toBeUndefined();
     expect(result.toolIntentRef).toEqual({ heap: 'agent/audit', id: 'block-1' });
     expect(result.guardDecisionRef).toEqual({ heap: 'agent/audit', id: 'block-2' });
     await expect(memory.getBlock(result.toolIntentRef)).resolves.toMatchObject({
@@ -69,7 +70,7 @@ describe('boundary tool registry and execution', () => {
     });
   });
 
-  it('blocks execution when guard asks for approval', async () => {
+  it('blocks execution when guard asks for approval and creates a durable approval request', async () => {
     const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
     const registry = createBoundaryToolRegistry();
     let called = false;
@@ -89,14 +90,40 @@ describe('boundary tool registry and execution', () => {
       memory,
       auditHeap: 'agent/audit',
       outputHeap: 'agent/tool-output',
+      approvalHeap: 'agent/approvals',
       toolName: 'file.write',
       args: { path: '/workspace/out.txt' },
       context,
+      originRefs: [{ heap: 'agent/sessions', id: 'session-1' }, { heap: 'agent/tasks', id: 'task-1' }],
     });
 
     expect(called).toBe(false);
     expect(result.guardDecision.disposition).toBe('ask');
     expect(result.result).toMatchObject({ skipped: true, error: 'Write operation requires approval unless separately pre-approved.' });
+    expect(result.approvalRequestRef).toEqual({ heap: 'agent/approvals', id: 'block-3' });
+    await expect(memory.getBlock(result.approvalRequestRef!)).resolves.toMatchObject({
+      type: 'proposal',
+      tags: ['approval-request', 'status:pending', 'surface:file', 'action:write', 'requester:mira'],
+      data: {
+        status: 'pending',
+        reason: 'Write operation requires approval unless separately pre-approved.',
+        proposedOperation: {
+          surface: 'file',
+          action: 'write',
+          target: '/workspace/out.txt',
+          args: { path: '/workspace/out.txt' },
+        },
+        exactRequest: { surface: 'file', action: 'write', target: '/workspace/out.txt' },
+        requester: 'mira',
+      },
+      links: [
+        { heap: 'agent/sessions', id: 'session-1' },
+        { heap: 'agent/tasks', id: 'task-1' },
+        result.toolIntentRef,
+        result.guardDecisionRef,
+      ],
+      metadata: { source: 'approval-request-model', exactOperationCaptured: true },
+    });
   });
 
   it('executes allowed local read-only tools and stores bounded output refs', async () => {

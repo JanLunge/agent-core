@@ -34,6 +34,8 @@ export interface CreateApprovalRequestBlockInput {
   requester: string;
   sessionRef?: BlockRef;
   taskRef?: BlockRef;
+  originRefs?: BlockRef[];
+  auditRefs?: BlockRef[];
   args?: Record<string, unknown>;
 }
 
@@ -90,7 +92,12 @@ export async function createApprovalRequestBlock(
       ...(input.sessionRef ? [`session:${input.sessionRef.id}`] : []),
       ...(input.taskRef ? [`task:${input.taskRef.id}`] : []),
     ],
-    links: [input.sessionRef, input.taskRef].filter((ref): ref is BlockRef => Boolean(ref)),
+    links: dedupeRefs([
+      input.sessionRef,
+      input.taskRef,
+      ...(input.originRefs ?? []),
+      ...(input.auditRefs ?? []),
+    ].filter((ref): ref is BlockRef => Boolean(ref))),
     metadata: { source: 'approval-request-model', exactOperationCaptured: true },
   })) as HeaperBlock<ApprovalRequestData>;
 }

@@ -69,7 +69,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 29 runtime CLI smoke command.
 - [x] Add Slice 30 LocalHeaperMemory runtime wiring.
 - [x] Add Slice 31 route/session store integration in orchestrator.
-- [ ] Add Slice 32 approval request integration in tool boundary.
+- [x] Add Slice 32 approval request integration in tool boundary.
 - [ ] Add Slice 33 notification intents in runtime outcome.
 - [ ] Add Slice 34 blocker persistence on runtime failures.
 - [ ] Add Slice 35 persona config integration into router/model defaults.
@@ -443,7 +443,7 @@ Validation:
 
 Status: implemented in `src/runtime/orchestrator.ts`; runtime now creates/resumes sessions through `HeaperSessionStore`, persists route records via `storeRouteDecision`, and links session messages through the session block plus event/route/model/guard refs.
 
-### Slice 32 — Approval request integration in tool boundary
+### Slice 32 — Approval request integration in tool boundary ✅
 
 Goal: when guarded tool execution returns `ask`, create a durable approval-request block rather than only returning a skipped result.
 
@@ -452,6 +452,8 @@ Validation:
 - deny decisions remain denials without approval blocks;
 - allow decisions execute normally;
 - approval refs link intent, guard decision, session/task origin refs.
+
+Status: implemented in `src/tools/boundary.ts`; ask decisions now create `approval-request` proposal refs with exact guard request/args and links to tool intent, guard decision, and origin refs, while deny/allow paths stay unchanged.
 
 ### Slice 33 — Notification intents in runtime outcome
 
