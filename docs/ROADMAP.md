@@ -80,7 +80,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 40 audit trail redaction policy tests for secret-like fields.
 - [x] Add Slice 41 resumable approval application flow.
 - [x] Add Slice 42 task-to-runtime continuation bridge.
-- [ ] Add Slice 43 persona daily continuity startup injection.
+- [x] Add Slice 43 persona daily continuity startup injection.
 - [ ] Add Slice 44 route handoff scoring notes and scaffold.
 - [ ] Add Slice 45 durable notification outbox blocks.
 - [ ] Add Slice 46 local audit compaction/snapshot command.
@@ -581,7 +581,7 @@ Validation:
 
 Status: implemented in `src/heartbeat/continuation-worker.ts`; `createRuntimeContinuationHandler` converts task blocks into background runtime events, stores runtime refs in task-result blocks, links those refs back to the result/task, and attaches runtime blocker refs when orchestration blocks.
 
-### Slice 43 — Persona daily continuity startup injection
+### Slice 43 — Persona daily continuity startup injection ✅
 
 Goal: feed daily continuity context into runtime working memory for personas at startup/first turn.
 
@@ -589,6 +589,8 @@ Validation:
 - reads yesterday/today persona daily heap;
 - includes bounded continuity text in working memory;
 - linked summaries remain refs, not copied hidden state.
+
+Status: implemented in `src/runtime/orchestrator.ts` and `src/conversation/working-memory.ts`; runtime reads yesterday/today daily continuity when a daily heap is configured, injects bounded continuity into working memory before responding, and carries linked session summaries as refs only.
 
 ### Slice 44 — Route handoff scoring notes and scaffold
 

@@ -261,6 +261,46 @@ describe('runRuntimeEvent', () => {
     });
   });
 
+  it('injects bounded daily continuity into persona working memory before responding', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block', now: () => '2026-04-28T08:00:00.000Z' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+    const yesterday = await memory.appendToDailyEntry('Yesterday: keep continuity from previous day.', 'persona/mira/daily', '2026-04-27');
+    const today = await memory.appendToDailyEntry('Today: active continuity note.', 'persona/mira/daily', '2026-04-28');
+    const summary = await memory.createBlock({
+      heap: 'persona/mira/sessions',
+      type: 'session',
+      data: { summary: 'full session transcript private should stay behind ref' },
+      tags: ['session-summary'],
+      links: [{ heap: today.heap, id: today.id }],
+    });
+
+    let observedWorkingMemory = '';
+    await runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-continuity-startup', channelType: 'telegram', chatId: 'jan', text: '@mira continue from daily', receivedAt: '2026-04-28T08:01:00.000Z' }),
+      router,
+      memory,
+      sessionHeap: 'persona/mira/sessions',
+      auditHeap: 'agent/audit',
+      dailyHeap: 'persona/mira/daily',
+      modelPolicy,
+      availableModels,
+      responder: ({ workingMemory }) => {
+        observedWorkingMemory = workingMemory.text;
+        return 'continued from daily';
+      },
+    });
+
+    expect(observedWorkingMemory).toContain('## Daily continuity');
+    expect(observedWorkingMemory).toContain('## 2026-04-27');
+    expect(observedWorkingMemory).toContain('Yesterday: keep continuity from previous day.');
+    expect(observedWorkingMemory).toContain('## 2026-04-28');
+    expect(observedWorkingMemory).toContain('Today: active continuity note.');
+    expect(observedWorkingMemory).toContain(`Linked session summaries: ${summary.heap}#${summary.id}`);
+    expect(observedWorkingMemory).not.toContain('full session transcript private should stay behind ref');
+    expect(observedWorkingMemory).toContain('@mira continue from daily');
+  });
+
   it('writes daily continuity for completed live turns when a daily heap is configured', async () => {
     const memory = new InMemoryHeaperMemory({ idPrefix: 'block', now: () => '2026-04-28T14:00:00.000Z' });
     const router = createRouter();

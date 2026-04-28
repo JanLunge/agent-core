@@ -21,12 +21,17 @@ export interface WorkingMemoryBundle {
   };
 }
 
+export interface WorkingMemoryContinuityContext {
+  text: string;
+}
+
 export interface SelectWorkingMemoryOptions {
   memory: HeaperMemory;
   history: Message[];
   query?: string;
   heaps?: HeapName[];
   filters?: Omit<SearchFilters, 'heaps' | 'limit'>;
+  continuity?: WorkingMemoryContinuityContext;
   recentMessageLimit?: number;
   retrievalLimit?: number;
   maxChars?: number;
@@ -68,6 +73,7 @@ export async function selectWorkingMemory(options: SelectWorkingMemoryOptions): 
   }));
 
   const { text, truncated } = renderBundle({
+    continuity: options.continuity,
     recentMessages,
     retrievedBlocks,
     maxChars: options.maxChars ?? DEFAULT_MAX_CHARS,
@@ -109,12 +115,17 @@ function dedupeBlocks(blocks: HeaperBlock[]): HeaperBlock[] {
 }
 
 function renderBundle(options: {
+  continuity?: WorkingMemoryContinuityContext;
   recentMessages: Message[];
   retrievedBlocks: WorkingMemoryBlock[];
   maxChars: number;
   maxMessageChars: number;
 }): { text: string; truncated: boolean } {
   const sections: string[] = [];
+
+  if (options.continuity?.text) {
+    sections.push(['## Daily continuity', options.continuity.text].join('\n'));
+  }
 
   if (options.recentMessages.length > 0) {
     sections.push([

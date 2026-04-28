@@ -1,7 +1,7 @@
 import type { NormalizedEvent } from '../events/index.js';
 import type { BlockRef, HeapName, HeaperBlock, HeaperMemory } from '../heaper/types.js';
 import { routeModel, type AvailableModel, type ModelRoutingDecision, type ModelRoutingPolicy, type TaskComplexity } from '../llm/model-routing.js';
-import { appendRuntimeDailyContinuity } from '../conversation/daily-continuity.js';
+import { appendRuntimeDailyContinuity, readDailyContinuity } from '../conversation/daily-continuity.js';
 import { HeaperSessionStore } from '../conversation/heaper-session-store.js';
 import { loadPersonaConfig, personaConfigToModelDefaults, type PersonaConfig } from '../heaper/persona-config.js';
 import { selectWorkingMemory, type WorkingMemoryBundle } from '../conversation/working-memory.js';
@@ -126,11 +126,19 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     ...(input.history ?? []),
     { role: 'user' as const, content: input.event.content, timestamp: input.event.receivedAt },
   ];
+  const dailyContinuityContext = input.dailyHeap
+    ? await readDailyContinuity({
+      memory: input.memory,
+      heap: input.dailyHeap,
+      today: input.event.receivedAt.slice(0, 10),
+    })
+    : undefined;
   const workingMemory = await selectWorkingMemory({
     memory: input.memory,
     history,
     query: input.event.content,
     heaps: [activeSessionHeap, ...(personaConfig?.defaultHeaps.shared ?? []), input.auditHeap],
+    continuity: dailyContinuityContext?.text ? { text: dailyContinuityContext.text } : undefined,
   });
 
   let model: ModelRoutingDecision;
