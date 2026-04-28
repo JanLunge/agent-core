@@ -22,6 +22,20 @@ export interface ReadDailyContinuityOptions {
   maxTextChars?: number;
 }
 
+export interface AppendRuntimeDailyContinuityOptions {
+  memory: HeaperMemory;
+  heap: HeapName;
+  date?: string;
+  mode: 'live' | 'async' | 'background';
+  sensitivity: 'normal' | 'sensitive';
+  agentName: string;
+  sessionId: string;
+  channelId: string;
+  reply: string;
+  refs: BlockRef[];
+  maxEntryChars?: number;
+}
+
 const DEFAULT_MAX_ENTRY_CHARS = 1200;
 const DEFAULT_MAX_TEXT_CHARS = 2400;
 
@@ -32,6 +46,31 @@ const DEFAULT_MAX_TEXT_CHARS = 2400;
  * bounded text and references to linked session summary blocks so callers can
  * fetch full session context explicitly when needed.
  */
+export async function appendRuntimeDailyContinuity(options: AppendRuntimeDailyContinuityOptions): Promise<HeaperBlock> {
+  if (options.mode === 'background') {
+    throw new Error('Runtime daily continuity is only written for completed live/async turns');
+  }
+
+  const date = options.date ?? new Date().toISOString().slice(0, 10);
+  const content = truncate(runtimeContinuityLine(options), options.maxEntryChars ?? DEFAULT_MAX_ENTRY_CHARS);
+  const dailyEntry = await options.memory.appendToDailyEntry(content, options.heap, date);
+  const links = dedupeRefs([...(dailyEntry.links ?? []), ...options.refs]);
+  const linked = await options.memory.updateBlock(refFor(dailyEntry), {
+    links,
+    metadata: { ...(dailyEntry.metadata ?? {}), source: 'runtime-daily-continuity', date, sensitivity: options.sensitivity },
+  });
+
+  for (const ref of options.refs) {
+    try {
+      await options.memory.linkBlocks(refFor(linked), ref);
+    } catch {
+      // Continuity should preserve the daily entry even if a caller supplies a stale optional ref.
+    }
+  }
+
+  return linked;
+}
+
 export async function readDailyContinuity(options: ReadDailyContinuityOptions): Promise<DailyContinuityContext> {
   const today = options.today ?? new Date().toISOString().slice(0, 10);
   const dates = [previousDate(today), today];
@@ -67,6 +106,15 @@ async function linkedSessionSummaryRefs(memory: HeaperMemory, dailyEntry: Heaper
     .map(refFor);
 }
 
+function runtimeContinuityLine(options: AppendRuntimeDailyContinuityOptions): string {
+  const refText = options.refs.map((ref) => `${ref.heap}#${ref.id}`).join(', ');
+  const prefix = `Runtime ${options.mode} turn for ${options.agentName} session=${options.sessionId} channel=${options.channelId}.`;
+  const summary = options.sensitivity === 'sensitive'
+    ? 'Sensitive content omitted; use linked refs with appropriate permissions.'
+    : `Reply: ${oneLine(options.reply)}`;
+  return `${prefix} ${summary}${refText ? ` Refs: ${refText}` : ''}`;
+}
+
 function renderContinuityText(entries: DailyContinuityEntry[]): string {
   return entries
     .map((entry) => {
@@ -84,6 +132,20 @@ function contentFor(block: HeaperBlock): string {
 
 function refFor(block: HeaperBlock): BlockRef {
   return { heap: block.heap, id: block.id };
+}
+
+function dedupeRefs(refs: BlockRef[]): BlockRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref) => {
+    const key = `${ref.heap}#${ref.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function oneLine(content: string): string {
+  return content.replace(/\s+/g, ' ').trim();
 }
 
 function previousDate(date: string): string {

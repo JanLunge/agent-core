@@ -261,6 +261,44 @@ describe('runRuntimeEvent', () => {
     });
   });
 
+  it('writes daily continuity for completed live turns when a daily heap is configured', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block', now: () => '2026-04-28T14:00:00.000Z' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    const first = await runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-daily-1', channelType: 'telegram', chatId: 'jan', text: '@mira first daily note', receivedAt: '2026-04-28T14:00:00.000Z' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      dailyHeap: 'persona/mira/daily',
+      modelPolicy,
+      availableModels,
+      responder: () => 'first continuity reply',
+    });
+    const second = await runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-daily-2', channelType: 'telegram', chatId: 'jan', text: '[sensitive] second private note', receivedAt: '2026-04-28T14:05:00.000Z' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      dailyHeap: 'persona/mira/daily',
+      modelPolicy,
+      availableModels,
+      responder: () => 'secret reply token=private',
+    });
+
+    expect(first.dailyContinuityRef).toEqual({ heap: 'persona/mira/daily', id: 'block-7' });
+    expect(second.dailyContinuityRef).toEqual(first.dailyContinuityRef);
+    const daily = await memory.getBlock(first.dailyContinuityRef!);
+    expect(String(daily?.data.content)).toContain('Reply: first continuity reply');
+    expect(String(daily?.data.content)).toContain('Sensitive content omitted');
+    expect(String(daily?.data.content)).not.toContain('token=private');
+    expect(daily?.links).toEqual(expect.arrayContaining([first.eventRef, first.routeRef, first.assistantMessageRef, second.eventRef, second.routeRef, second.assistantMessageRef]));
+    expect(second.notificationIntent.refs).toContainEqual(first.dailyContinuityRef);
+  });
+
   it('keeps ordinary background progress silent in the runtime notification intent', async () => {
     const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
     const router = createRouter();

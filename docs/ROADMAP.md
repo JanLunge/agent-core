@@ -74,7 +74,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 34 blocker persistence on runtime failures.
 - [x] Add Slice 35 persona config integration into router/model defaults.
 - [x] Add Slice 36 background worker uses LocalHeaperMemory.
-- [ ] Add Slice 37 daily continuity writes from completed runtime turns.
+- [x] Add Slice 37 daily continuity writes from completed runtime turns.
 - [ ] Add Slice 38 real-run audit export command.
 
 ## Active Slice Queue
@@ -503,7 +503,7 @@ Validation:
 
 Status: implemented in `src/heartbeat/continuation-worker.ts`; continuation worker now works across `LocalHeaperMemory` restarts, uses notification policy intents, and persists blocker refs for blocked tasks.
 
-### Slice 37 — Daily continuity writes from completed runtime turns
+### Slice 37 — Daily continuity writes from completed runtime turns ✅
 
 Goal: write concise daily continuity entries or linked summaries after completed runtime turns.
 
@@ -512,6 +512,8 @@ Validation:
 - daily entry links session/route/result refs;
 - repeated turns append without deleting prior content;
 - sensitive content is summarized or ref-linked safely.
+
+Status: implemented in `src/conversation/daily-continuity.ts` and `src/runtime/orchestrator.ts`; completed live/async runtime turns can append bounded continuity entries, link event/route/model/message/guard/blocker refs, reuse the same daily entry across turns, and omit sensitive reply content.
 
 ### Slice 38 — Real-run audit export command
 

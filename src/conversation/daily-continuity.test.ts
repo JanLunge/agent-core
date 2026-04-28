@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { InMemoryHeaperMemory } from '../heaper/memory.js';
-import { readDailyContinuity } from './daily-continuity.js';
+import { appendRuntimeDailyContinuity, readDailyContinuity } from './daily-continuity.js';
 import { createSessionSummaryBlock } from './session-summary.js';
 import type { ConversationRow, MessageWithMeta } from './persistence.js';
 
@@ -20,7 +20,7 @@ function message(content: string): MessageWithMeta {
   return { id: 1, role: 'user', content, timestamp: '2026-04-26T10:00:00.000Z' };
 }
 
-describe('readDailyContinuity', () => {
+describe('daily continuity', () => {
   it('returns an empty context object for empty days', async () => {
     const memory = new InMemoryHeaperMemory();
 
@@ -62,6 +62,74 @@ describe('readDailyContinuity', () => {
       { heap: result.summaryBlock.heap, id: result.summaryBlock.id },
     ]);
     expect(context.text).toContain(`Linked session summaries: ${result.summaryBlock.heap}#${result.summaryBlock.id}`);
+  });
+
+  it('appends bounded runtime continuity entries and links runtime refs', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block', now: () => '2026-04-28T14:00:00.000Z' });
+    const event = await memory.createBlock({ heap: 'agent/audit', type: 'metadata', data: { event: 'e' }, tags: ['runtime-event'] });
+    const route = await memory.createBlock({ heap: 'agent/audit', type: 'metadata', data: { route: 'r' }, tags: ['route-record'] });
+
+    const daily = await appendRuntimeDailyContinuity({
+      memory,
+      heap: 'persona/mira/daily',
+      date: '2026-04-28',
+      mode: 'live',
+      sensitivity: 'normal',
+      agentName: 'mira',
+      sessionId: 'mira-1',
+      channelId: 'telegram:jan',
+      reply: 'hello\nJan',
+      refs: [{ heap: event.heap, id: event.id }, { heap: route.heap, id: route.id }, { heap: event.heap, id: event.id }],
+      maxEntryChars: 500,
+    });
+
+    expect(daily).toMatchObject({
+      type: 'daily-entry',
+      data: { date: '2026-04-28' },
+      links: [{ heap: event.heap, id: event.id }, { heap: route.heap, id: route.id }],
+      metadata: { source: 'runtime-daily-continuity', date: '2026-04-28', sensitivity: 'normal' },
+    });
+    expect(daily.data.content).toContain('Runtime live turn for mira session=mira-1 channel=telegram:jan. Reply: hello Jan');
+    await expect(memory.getRelatedBlocks({ heap: daily.heap, id: daily.id })).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ heap: event.heap, id: event.id }),
+        expect.objectContaining({ heap: route.heap, id: route.id }),
+      ]),
+    );
+  });
+
+  it('omits sensitive reply content from runtime daily continuity', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const daily = await appendRuntimeDailyContinuity({
+      memory,
+      heap: 'persona/mira/daily',
+      date: '2026-04-28',
+      mode: 'async',
+      sensitivity: 'sensitive',
+      agentName: 'mira',
+      sessionId: 'mira-1',
+      channelId: 'telegram:jan',
+      reply: 'secret token=do-not-store',
+      refs: [],
+    });
+
+    expect(String(daily.data.content)).toContain('Sensitive content omitted');
+    expect(String(daily.data.content)).not.toContain('do-not-store');
+  });
+
+  it('rejects background runtime daily writes', async () => {
+    const memory = new InMemoryHeaperMemory();
+    await expect(appendRuntimeDailyContinuity({
+      memory,
+      heap: 'agent/daily',
+      mode: 'background',
+      sensitivity: 'normal',
+      agentName: 'mira',
+      sessionId: 'task-1',
+      channelId: 'background:task-1',
+      reply: 'done',
+      refs: [],
+    })).rejects.toThrow('only written for completed live/async turns');
   });
 
   it('bounds entry content and rendered startup text', async () => {

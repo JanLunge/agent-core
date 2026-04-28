@@ -1,6 +1,7 @@
 import type { NormalizedEvent } from '../events/index.js';
 import type { BlockRef, HeapName, HeaperBlock, HeaperMemory } from '../heaper/types.js';
 import { routeModel, type AvailableModel, type ModelRoutingDecision, type ModelRoutingPolicy, type TaskComplexity } from '../llm/model-routing.js';
+import { appendRuntimeDailyContinuity } from '../conversation/daily-continuity.js';
 import { HeaperSessionStore } from '../conversation/heaper-session-store.js';
 import { loadPersonaConfig, personaConfigToModelDefaults, type PersonaConfig } from '../heaper/persona-config.js';
 import { selectWorkingMemory, type WorkingMemoryBundle } from '../conversation/working-memory.js';
@@ -29,6 +30,7 @@ export interface RunRuntimeEventInput {
   auditHeap: HeapName;
   blockerHeap?: HeapName;
   personaConfigHeap?: HeapName;
+  dailyHeap?: HeapName;
   modelPolicy: ModelRoutingPolicy;
   availableModels: AvailableModel[];
   complexity?: TaskComplexity;
@@ -47,6 +49,7 @@ export interface RuntimeOutcome {
   sessionHeap: HeapName;
   userMessageRef: BlockRef;
   assistantMessageRef: BlockRef;
+  dailyContinuityRef?: BlockRef;
   notificationIntent: NotificationIntent;
   workingMemory: WorkingMemoryBundle;
   reply: string;
@@ -225,18 +228,36 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     { role: 'assistant', content: reply },
     [refFor(userMessage), refFor(routeBlock), refFor(modelBlock), ...guardBlocks.map(refFor), ...blockerBlocks.map(refFor)],
   );
+  const continuityRefs = [
+    refFor(eventBlock),
+    refFor(routeBlock),
+    refFor(modelBlock),
+    refFor(userMessage),
+    refFor(assistantMessage),
+    ...guardBlocks.map(refFor),
+    ...blockerBlocks.map(refFor),
+  ];
+  const dailyContinuity = input.dailyHeap && input.event.modeHint !== 'background'
+    ? await appendRuntimeDailyContinuity({
+      memory: input.memory,
+      heap: input.dailyHeap,
+      date: input.event.receivedAt.slice(0, 10),
+      mode: input.event.modeHint,
+      sensitivity: route.sensitivity,
+      agentName: route.agentName,
+      sessionId: route.sessionId,
+      channelId: route.channelId,
+      reply,
+      refs: continuityRefs,
+    })
+    : undefined;
   const notificationIntent = decideNotification({
     mode: input.event.modeHint,
     trigger: notificationTriggerFor(input.event.modeHint, guardDecisions, blockerBlocks.map(refFor)),
     summary: reply,
     refs: [
-      refFor(eventBlock),
-      refFor(routeBlock),
-      refFor(modelBlock),
-      refFor(userMessage),
-      refFor(assistantMessage),
-      ...guardBlocks.map(refFor),
-      ...blockerBlocks.map(refFor),
+      ...continuityRefs,
+      ...(dailyContinuity ? [refFor(dailyContinuity)] : []),
     ],
   });
 
@@ -250,6 +271,7 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     sessionHeap: activeSessionHeap,
     userMessageRef: refFor(userMessage),
     assistantMessageRef: refFor(assistantMessage),
+    dailyContinuityRef: dailyContinuity ? refFor(dailyContinuity) : undefined,
     notificationIntent,
     workingMemory,
     reply,
