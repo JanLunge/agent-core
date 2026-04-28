@@ -65,6 +65,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 25 Heaper adapter contract tests.
 - [x] Add Slice 26 persona configuration loader.
 - [x] Add Slice 27 delegation/reference workflow.
+- [x] Add Slice 28 end-to-end smoke scenario.
 
 ## Active Slice Queue
 
@@ -384,7 +385,7 @@ Validation:
 
 Status: implemented in `src/heaper/delegation.ts` with tests in `src/heaper/delegation.test.ts`.
 
-### Slice 28 — End-to-end smoke scenario
+### Slice 28 — End-to-end smoke scenario ✅
 
 Goal: add one integration test for the intended loop: chat event -> route -> context -> fake agent -> guarded tool/output -> memory/session write -> progress report.
 
@@ -393,6 +394,8 @@ Validation:
 - covers normal mode and one sensitive-mode variant;
 - verifies all important artifacts are linked by refs;
 - progress reporter can summarize the run.
+
+Status: implemented in `src/runtime/e2e-smoke.test.ts`.
 
 ## Reporting Template
 
