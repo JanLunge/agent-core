@@ -11,6 +11,10 @@
   },
   "scripts": {
     "dev": "tsx src/cli/index.ts",
+    "start": "tsx src/cli/index.ts start -d .",
+    "dev:start": "tsx src/cli/index.ts start -d .",
+    "status": "tsx src/cli/index.ts status -d .",
+    "chat": "tsx src/cli/index.ts chat",
     "dev:telegram-spike": "tsx src/cli/index.ts runtime-telegram-spike --store ./data/runtime-telegram-spike-memory.json --allowed-user 177485465",
     "start:telegram-spike": "tsx src/cli/index.ts runtime-telegram-spike --store ./data/runtime-telegram-spike-memory.json --allowed-user 177485465",
     "build": "pnpm run build:dashboard && tsup",
