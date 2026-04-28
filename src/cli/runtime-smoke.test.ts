@@ -66,4 +66,16 @@ describe('runRuntimeSmoke', () => {
     expect(result.lines[0]).toBe('Runtime smoke completed');
     expect(result.refs.event.heap).toBe('agent/audit');
   });
+
+  it('can run twice against a configured local runtime store and see prior blocks', async () => {
+    const storePath = await tempStorePath();
+    const first = await runRuntimeSmoke({ message: 'first', memoryConfig: { kind: 'local', path: storePath, id_prefix: 'cfg' } });
+    const second = await runRuntimeSmoke({ message: 'second', memoryConfig: { kind: 'local', path: storePath, id_prefix: 'cfg' } });
+
+    expect(first.refs.event.id).toBe('cfg-1');
+    expect(second.refs.event.id).toBe('cfg-9');
+    const memory = new LocalHeaperMemory({ filePath: storePath, idPrefix: 'unused' });
+    const messages = await memory.search('first', { heaps: ['persona/mira/sessions'], tags: ['session-message'] });
+    expect(messages.map((block) => block.data.content)).toContain('@mira first');
+  });
 });

@@ -67,7 +67,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 27 delegation/reference workflow.
 - [x] Add Slice 28 end-to-end smoke scenario.
 - [x] Add Slice 29 runtime CLI smoke command.
-- [ ] Add Slice 30 LocalHeaperMemory runtime wiring.
+- [x] Add Slice 30 LocalHeaperMemory runtime wiring.
 - [ ] Add Slice 31 route/session store integration in orchestrator.
 - [ ] Add Slice 32 approval request integration in tool boundary.
 - [ ] Add Slice 33 notification intents in runtime outcome.
@@ -419,7 +419,7 @@ Validation:
 
 Status: implemented in `src/cli/runtime-smoke.ts` with tests in `src/cli/runtime-smoke.test.ts`; exposed as `agent-core runtime-smoke <message>`.
 
-### Slice 30 — LocalHeaperMemory runtime wiring
+### Slice 30 — LocalHeaperMemory runtime wiring ✅
 
 Goal: make runtime scaffolding able to use `LocalHeaperMemory` through configuration rather than test-only constructors.
 
@@ -428,6 +428,8 @@ Validation:
 - local path is created safely if missing;
 - existing storage is loaded without migration/destruction;
 - runtime smoke can be run twice and see prior blocks.
+
+Status: implemented in `src/runtime/memory-config.ts` with tests in `src/runtime/memory-config.test.ts`; `runtime_memory` config now selects in-memory or local durable storage.
 
 ### Slice 31 — Route/session store integration in orchestrator
 

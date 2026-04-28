@@ -1,8 +1,9 @@
 import { mkdtemp } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import type { MasterConfig } from '../config/schema.js';
 import { createChatEvent } from '../events/index.js';
-import { LocalHeaperMemory } from '../heaper/local-storage.js';
+import { createRuntimeMemory } from '../runtime/memory-config.js';
 import type { BlockRef, HeapName } from '../heaper/types.js';
 import { createRouter } from '../router/router.js';
 import { createBoundaryToolRegistry, executeBoundaryTool } from '../tools/boundary.js';
@@ -14,6 +15,8 @@ export interface RuntimeSmokeOptions {
   persona?: string;
   storePath?: string;
   channel?: string;
+  baseDir?: string;
+  memoryConfig?: MasterConfig['runtime_memory'];
 }
 
 export interface RuntimeSmokeResult {
@@ -46,8 +49,13 @@ const availableModels = [
 
 export async function runRuntimeSmoke(options: RuntimeSmokeOptions): Promise<RuntimeSmokeResult> {
   const persona = normalizePersona(options.persona ?? 'mira');
-  const storePath = options.storePath ?? join(await mkdtemp(join(tmpdir(), 'agent-core-runtime-smoke-')), 'memory.json');
-  const memory = new LocalHeaperMemory({ filePath: storePath, idPrefix: 'smoke' });
+  const storePath = options.storePath ?? (options.memoryConfig?.kind === 'local' ? options.memoryConfig.path : undefined) ?? join(await mkdtemp(join(tmpdir(), 'agent-core-runtime-smoke-')), 'memory.json');
+  const selection = createRuntimeMemory({
+    baseDir: options.baseDir ?? process.cwd(),
+    config: options.memoryConfig ?? { kind: 'local', path: storePath, id_prefix: 'smoke' },
+  });
+  const memory = selection.memory;
+  const reportedStorePath = selection.path ?? 'in-memory';
   const router = createRouter();
   const harness = createFakeAgentHarness(persona, [{ kind: 'echo', prefix: `smoke:${persona}` }]);
   router.registerAgent(persona, harness.agent);
@@ -111,7 +119,7 @@ export async function runRuntimeSmoke(options: RuntimeSmokeOptions): Promise<Run
 
   const lines = [
     'Runtime smoke completed',
-    `Store: ${storePath}`,
+    `Store: ${reportedStorePath}`,
     `Reply: ${outcome.reply}`,
     `Event: ${formatRef(refs.event)}`,
     `Route: ${formatRef(refs.route)}`,
@@ -123,7 +131,7 @@ export async function runRuntimeSmoke(options: RuntimeSmokeOptions): Promise<Run
     `Tool output: ${refs.toolOutput ? formatRef(refs.toolOutput) : 'inline'}`,
   ];
 
-  return { reply: outcome.reply, storePath, refs, lines };
+  return { reply: outcome.reply, storePath: reportedStorePath, refs, lines };
 }
 
 function normalizePersona(value: string): string {

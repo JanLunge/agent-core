@@ -106,8 +106,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 28 — End-to-end smoke scenario');
-    expect(report.text).toContain('Active slice: Slice 29 — Runtime CLI smoke command');
+    expect(report.text).toContain('Completed slice: Slice 29 — Runtime CLI smoke command');
+    expect(report.text).toContain('Active slice: Slice 30 — LocalHeaperMemory runtime wiring');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {

@@ -92,6 +92,17 @@ export const EmbeddingConfigSchema = z.object({
 
 export type EmbeddingConfig = z.infer<typeof EmbeddingConfigSchema>;
 
+// --- Runtime memory ---
+
+export const RuntimeMemoryConfigSchema = z.object({
+  kind: z.enum(['memory', 'local']).default('memory'),
+  /** Path for local durable HeaperMemory JSON storage. Relative to base dir when not absolute. */
+  path: z.string().optional(),
+  id_prefix: z.string().optional(),
+}).default({});
+
+export type RuntimeMemoryConfig = z.infer<typeof RuntimeMemoryConfigSchema>;
+
 // --- Master config ---
 
 export const MasterConfigSchema = z.object({
@@ -123,6 +134,7 @@ export const MasterConfigSchema = z.object({
   mcp_servers: z.array(McpServerConfigSchema).default([]),
   telegram: TelegramConfigSchema.default({}),
   embeddings: EmbeddingConfigSchema.optional(),
+  runtime_memory: RuntimeMemoryConfigSchema,
 });
 
 export type MasterConfig = z.infer<typeof MasterConfigSchema>;

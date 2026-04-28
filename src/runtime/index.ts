@@ -20,6 +20,15 @@ export type {
 } from './fake-agent.js';
 
 export {
+  createRuntimeMemory,
+} from './memory-config.js';
+export type {
+  CreateRuntimeMemoryInput,
+  RuntimeMemoryKind,
+  RuntimeMemorySelection,
+} from './memory-config.js';
+
+export {
   classifyRuntimeBlocker,
   createRuntimeBlockerBlock,
   redactSensitiveDetails,
