@@ -73,7 +73,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 33 notification intents in runtime outcome.
 - [x] Add Slice 34 blocker persistence on runtime failures.
 - [x] Add Slice 35 persona config integration into router/model defaults.
-- [ ] Add Slice 36 background worker uses LocalHeaperMemory.
+- [x] Add Slice 36 background worker uses LocalHeaperMemory.
 - [ ] Add Slice 37 daily continuity writes from completed runtime turns.
 - [ ] Add Slice 38 real-run audit export command.
 
@@ -491,7 +491,7 @@ Validation:
 
 Status: implemented in `src/runtime/orchestrator.ts`; runtime can load persona config blocks before model routing, use persona session/shared heaps for working memory, merge persona model defaults into routing policy, and persist a blocker when config validation fails.
 
-### Slice 36 — Background worker uses LocalHeaperMemory
+### Slice 36 — Background worker uses LocalHeaperMemory ✅
 
 Goal: allow the continuation worker to process durable local task blocks across process restarts.
 
@@ -500,6 +500,8 @@ Validation:
 - result/progress blocks are linked to task;
 - notification policy controls whether Jan is interrupted;
 - blocked tasks persist blocker refs.
+
+Status: implemented in `src/heartbeat/continuation-worker.ts`; continuation worker now works across `LocalHeaperMemory` restarts, uses notification policy intents, and persists blocker refs for blocked tasks.
 
 ### Slice 37 — Daily continuity writes from completed runtime turns
 

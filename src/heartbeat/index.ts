@@ -5,8 +5,6 @@ export type { ScheduledTask, ParsedSchedule } from './tasks.js';
 export { runContinuationWorker } from './continuation-worker.js';
 export type {
   ContinuationHandlerContext,
-  ContinuationNotificationIntent,
-  ContinuationNotificationKind,
   ContinuationTaskHandler,
   ContinuationWorkerResult,
   RunContinuationWorkerInput,

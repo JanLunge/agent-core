@@ -109,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 35 — Persona config integration into router/model defaults');
-    expect(report.text).toContain('Active slice: Slice 36 — Background worker uses LocalHeaperMemory');
+    expect(report.text).toContain('Completed slice: Slice 36 — Background worker uses LocalHeaperMemory');
+    expect(report.text).toContain('Active slice: Slice 37 — Daily continuity writes from completed runtime turns');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {

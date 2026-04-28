@@ -1,6 +1,10 @@
+import { mkdtemp } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { createTaskBlock, transitionTaskBlock } from '../heaper/task-blocks.js';
 import { InMemoryHeaperMemory } from '../heaper/memory.js';
+import { LocalHeaperMemory } from '../heaper/local-storage.js';
 import { runContinuationWorker } from './continuation-worker.js';
 
 describe('runContinuationWorker', () => {
@@ -26,8 +30,14 @@ describe('runContinuationWorker', () => {
     expect(result.processed).toEqual([
       { taskRef: { heap: 'agent/tasks', id: task.id }, status: 'done', resultRef: { heap: 'agent/results', id: 'block-2' } },
     ]);
-    expect(result.notifications).toEqual([
-      { kind: 'milestone', taskRef: { heap: 'agent/tasks', id: task.id }, message: 'slice complete' },
+    expect(result.notifications).toMatchObject([
+      {
+        action: 'notify',
+        priority: 'normal',
+        reason: 'A meaningful milestone completed.',
+        message: 'slice complete',
+        refs: [{ heap: 'agent/tasks', id: task.id }, { heap: 'agent/results', id: 'block-2' }],
+      },
     ]);
 
     const updatedTask = await memory.getBlock(task);
@@ -90,10 +100,58 @@ describe('runContinuationWorker', () => {
       handleTask: () => ({ status: 'blocked', summary: 'cannot continue', reason: 'needs product decision' }),
     });
 
-    expect(result.notifications).toEqual([
-      { kind: 'blocker', taskRef: { heap: 'agent/tasks', id: task.id }, message: 'needs product decision' },
+    expect(result.notifications).toMatchObject([
+      {
+        action: 'notify',
+        priority: 'high',
+        reason: 'A blocker needs human attention before work can continue.',
+        message: 'needs product decision',
+        refs: [{ heap: 'agent/tasks', id: task.id }, { heap: 'agent/results', id: 'block-2' }, { heap: 'agent/results', id: 'block-3' }],
+      },
     ]);
     const updatedTask = await memory.getBlock(task);
-    expect(updatedTask?.data).toMatchObject({ status: 'blocked', statusReason: 'needs product decision' });
+    expect(updatedTask?.data).toMatchObject({
+      status: 'blocked',
+      statusReason: 'needs product decision',
+      blockerRefs: [{ heap: 'agent/results', id: 'block-3' }],
+    });
+  });
+
+  it('processes a pending task that survives a LocalHeaperMemory restart', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-core-continuation-worker-'));
+    const filePath = join(dir, 'memory.json');
+    const firstMemory = new LocalHeaperMemory({ filePath, idPrefix: 'local', now: () => '2026-04-28T13:00:00.000Z' });
+    const task = await createTaskBlock({
+      memory: firstMemory,
+      heap: 'agent/tasks',
+      title: 'Restart-safe task',
+      description: 'Continue after process restart.',
+      taskType: 'heartbeat',
+      owner: { kind: 'agent', name: 'mira' },
+    });
+
+    const restartedMemory = new LocalHeaperMemory({ filePath, idPrefix: 'local', now: () => '2026-04-28T13:01:00.000Z' });
+    const result = await runContinuationWorker({
+      memory: restartedMemory,
+      taskHeaps: ['agent/tasks'],
+      resultHeap: 'agent/results',
+      blockerHeap: 'agent/blockers',
+      now: '2026-04-28T13:01:00.000Z',
+      handleTask: ({ task }) => ({ status: 'done', summary: `resumed ${task.id}`, notify: false }),
+    });
+
+    expect(result.processed).toEqual([
+      { taskRef: { heap: 'agent/tasks', id: task.id }, status: 'done', resultRef: { heap: 'agent/results', id: 'local-2' }, blockerRef: undefined },
+    ]);
+    expect(result.notifications).toEqual([]);
+
+    const inspectionMemory = new LocalHeaperMemory({ filePath, idPrefix: 'unused' });
+    await expect(inspectionMemory.getBlock(task)).resolves.toMatchObject({
+      data: { status: 'done', resultRefs: [{ heap: 'agent/results', id: 'local-2' }] },
+    });
+    await expect(inspectionMemory.getBlock({ heap: 'agent/results', id: 'local-2' })).resolves.toMatchObject({
+      data: { status: 'done', summary: `resumed ${task.id}` },
+      links: [{ heap: 'agent/tasks', id: task.id }],
+    });
   });
 });

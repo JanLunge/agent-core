@@ -16,6 +16,7 @@ export interface TaskBlockData extends Record<string, unknown> {
   owner: TaskOwner;
   originSession?: BlockRef;
   resultRefs: BlockRef[];
+  blockerRefs?: BlockRef[];
   statusReason?: string;
   startedAt?: string;
   completedAt?: string;
@@ -45,6 +46,12 @@ export interface LinkTaskResultInput {
   memory: HeaperMemory;
   task: BlockRef;
   result: BlockRef;
+}
+
+export interface LinkTaskBlockerInput {
+  memory: HeaperMemory;
+  task: BlockRef;
+  blocker: BlockRef;
 }
 
 export interface QueryResumableTasksInput {
@@ -98,6 +105,17 @@ export async function linkTaskResult(input: LinkTaskResultInput): Promise<Heaper
     links: dedupeRefs([...(existing.links ?? []), input.result]),
   });
   await input.memory.linkBlocks(input.task, input.result);
+  return updated as HeaperBlock<TaskBlockData>;
+}
+
+export async function linkTaskBlocker(input: LinkTaskBlockerInput): Promise<HeaperBlock<TaskBlockData>> {
+  const existing = await requireTask(input.memory, input.task);
+  const blockerRefs = dedupeRefs([...(existing.data.blockerRefs ?? []), input.blocker]);
+  const updated = await input.memory.updateBlock(input.task, {
+    data: { blockerRefs },
+    links: dedupeRefs([...(existing.links ?? []), input.blocker]),
+  });
+  await input.memory.linkBlocks(input.task, input.blocker);
   return updated as HeaperBlock<TaskBlockData>;
 }
 
