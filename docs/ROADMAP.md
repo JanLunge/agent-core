@@ -83,7 +83,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 43 persona daily continuity startup injection.
 - [x] Add Slice 44 route handoff scoring notes and scaffold.
 - [x] Add Slice 45 durable notification outbox blocks.
-- [ ] Add Slice 46 local audit compaction/snapshot command.
+- [x] Add Slice 46 local audit compaction/snapshot command.
 - [ ] Add Slice 47 runtime health/status command over local memory.
 - [ ] Add Slice 48 Heaper adapter migration checklist and contract gaps.
 
@@ -614,7 +614,7 @@ Validation:
 
 Status: implemented in `src/notifications/outbox.ts`; notification intents can be persisted as `notification-outbox` blocks, queued/summarized/delivered/failed/cancelled states are explicit, refs are linked for audit, and silent intents are summarized rather than queued for delivery.
 
-### Slice 46 — Local audit compaction/snapshot command
+### Slice 46 — Local audit compaction/snapshot command ✅
 
 Goal: produce bounded snapshots from verbose audit trails without deleting underlying blocks.
 
@@ -622,6 +622,8 @@ Validation:
 - snapshot block links source refs;
 - raw blocks remain untouched;
 - export can include snapshot plus refs.
+
+Status: implemented in `src/cli/audit-export.ts`; `agent-core audit-snapshot <heap#id> --store <path> --heap <heap>` creates bounded `audit-snapshot` metadata blocks with linked source refs, preserves raw blocks, and snapshots are visible through normal audit export.
 
 ### Slice 47 — Runtime health/status command over local memory
 

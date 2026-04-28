@@ -29,7 +29,7 @@ import { SecretResolver } from '../secrets/resolver.js';
 import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
 import { runRuntimeSmoke } from './runtime-smoke.js';
 import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
-import { runAuditExport } from './audit-export.js';
+import { runAuditExport, runAuditSnapshot } from './audit-export.js';
 import { renderTelegramAuditFixture, runTelegramAuditFixture } from './audit-export-fixture.js';
 
 const program = new Command();
@@ -293,6 +293,32 @@ program
       console.log(await runAuditExport({ storePath: resolve(opts.store), ref, maxDepth }));
     } catch (err) {
       console.error('Audit export failed:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('audit-snapshot <ref>')
+  .description('Create a bounded audit snapshot block from a LocalHeaperMemory store block ref')
+  .requiredOption('-s, --store <path>', 'Local HeaperMemory JSON store path')
+  .option('--heap <heap>', 'Heap for the snapshot block', 'agent/audit')
+  .option('-d, --depth <n>', 'Maximum link traversal depth', '5')
+  .option('-m, --max-chars <n>', 'Maximum snapshot content characters', '4000')
+  .action(async (ref: string, opts: { store: string; heap: string; depth: string; maxChars: string }) => {
+    try {
+      const maxDepth = Number.parseInt(opts.depth, 10);
+      const maxChars = Number.parseInt(opts.maxChars, 10);
+      if (!Number.isFinite(maxDepth) || maxDepth < 0) throw new Error(`Invalid depth: ${opts.depth}`);
+      if (!Number.isFinite(maxChars) || maxChars < 1) throw new Error(`Invalid max chars: ${opts.maxChars}`);
+      console.log(await runAuditSnapshot({
+        storePath: resolve(opts.store),
+        ref,
+        snapshotHeap: opts.heap as `human/${string}` | `agent/${string}` | `persona/${string}/${string}`,
+        maxDepth,
+        maxChars,
+      }));
+    } catch (err) {
+      console.error('Audit snapshot failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
   });

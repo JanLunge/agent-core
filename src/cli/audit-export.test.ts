@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { InMemoryHeaperMemory } from '../heaper/memory.js';
 import { LocalHeaperMemory } from '../heaper/local-storage.js';
-import { exportAuditTrail, parseBlockRef, runAuditExport } from './audit-export.js';
+import { createAuditSnapshot, exportAuditTrail, parseBlockRef, runAuditExport, runAuditSnapshot } from './audit-export.js';
 
 describe('audit export', () => {
   it('exports a deterministic linked runtime trail from a session ref', async () => {
@@ -107,6 +107,69 @@ describe('audit export', () => {
     for (const secret of ['bearer-token-value', 'header-api-key-value', 'nested-token-value', 'tool-api-key-value', 'array-bearer-value', 'array-password-value', 'proposal-secret-value']) {
       expect(text).not.toContain(secret);
     }
+  });
+
+  it('creates bounded audit snapshots that link source refs without deleting raw blocks', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'snap', now: () => '2026-04-28T15:03:00.000Z' });
+    const session = await memory.createBlock({ heap: 'agent/sessions', type: 'session', data: { sessionId: 'snap-1' }, tags: ['session'] });
+    const event = await memory.createBlock({ heap: 'agent/audit', type: 'metadata', data: { event: { id: 'evt-snap', content: 'snapshot source content' } }, tags: ['runtime-event'], links: [{ heap: session.heap, id: session.id }] });
+    const route = await memory.createBlock({ heap: 'agent/audit', type: 'metadata', data: { route: { reason: 'default-agent' } }, tags: ['route-record'], links: [{ heap: event.heap, id: event.id }] });
+
+    const snapshot = await createAuditSnapshot({
+      memory,
+      startRef: { heap: session.heap, id: session.id },
+      snapshotHeap: 'agent/audit',
+      maxDepth: 3,
+      maxChars: 180,
+    });
+
+    expect(snapshot).toMatchObject({
+      heap: 'agent/audit',
+      type: 'metadata',
+      tags: expect.arrayContaining(['audit-snapshot', `start:${session.id}`, 'blocks:3']),
+      data: {
+        startRef: { heap: session.heap, id: session.id },
+        blockCount: 3,
+        maxDepth: 3,
+        truncated: true,
+        sourceRefs: [
+          { heap: session.heap, id: session.id },
+          { heap: event.heap, id: event.id },
+          { heap: route.heap, id: route.id },
+        ],
+      },
+      links: [
+        { heap: session.heap, id: session.id },
+        { heap: event.heap, id: event.id },
+        { heap: route.heap, id: route.id },
+      ],
+      metadata: { source: 'audit-snapshot', preservesRawBlocks: true },
+    });
+    expect(String(snapshot.data.content).length).toBeLessThanOrEqual(180);
+    await expect(memory.getBlock({ heap: event.heap, id: event.id })).resolves.toMatchObject({ data: { event: { content: 'snapshot source content' } } });
+
+    const exported = await exportAuditTrail({ memory, startRef: { heap: session.heap, id: session.id }, maxDepth: 1 });
+    expect(exported).toContain(`[snapshot] type=metadata`);
+    expect(exported).toContain(`${snapshot.heap}#${snapshot.id}`);
+  });
+
+  it('runs snapshot command against LocalHeaperMemory stores', async () => {
+    const dir = await mkdtemp(join(tmpdir(), 'agent-core-audit-snapshot-'));
+    const storePath = join(dir, 'memory.json');
+    const memory = new LocalHeaperMemory({ filePath: storePath, idPrefix: 'local', now: () => '2026-04-28T15:04:00.000Z' });
+    const task = await memory.createBlock({ heap: 'agent/tasks', type: 'task', data: { status: 'done', title: 'snapshot me' }, tags: ['task'] });
+    await memory.createBlock({ heap: 'agent/results', type: 'text', data: { summary: 'snapshot result' }, tags: ['task-result'], links: [{ heap: task.heap, id: task.id }] });
+
+    const text = await runAuditSnapshot({ storePath, ref: 'agent/tasks#local-1', snapshotHeap: 'agent/audit', maxDepth: 2, maxChars: 500 });
+
+    expect(text).toContain('Created audit snapshot agent/audit#local-3');
+    expect(text).toContain('Source: agent/tasks#local-1');
+    expect(text).toContain('Blocks: 2');
+    const inspection = new LocalHeaperMemory({ filePath: storePath });
+    await expect(inspection.getBlock({ heap: 'agent/audit', id: 'local-3' })).resolves.toMatchObject({
+      tags: expect.arrayContaining(['audit-snapshot']),
+      links: [{ heap: 'agent/tasks', id: 'local-1' }, { heap: 'agent/results', id: 'local-2' }],
+    });
   });
 
   it('runs against LocalHeaperMemory stores and parses refs', async () => {

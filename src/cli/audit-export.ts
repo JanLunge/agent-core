@@ -14,7 +14,26 @@ export interface RunAuditExportOptions {
   maxDepth?: number;
 }
 
+export interface AuditTrailBlock {
+  block: HeaperBlock;
+  depth: number;
+}
+
+export interface CreateAuditSnapshotOptions extends ExportAuditTrailOptions {
+  snapshotHeap: HeapName;
+  maxChars?: number;
+}
+
+export interface RunAuditSnapshotOptions {
+  storePath: string;
+  ref: string;
+  snapshotHeap: HeapName;
+  maxDepth?: number;
+  maxChars?: number;
+}
+
 const DEFAULT_MAX_DEPTH = 5;
+const DEFAULT_SNAPSHOT_MAX_CHARS = 4000;
 
 const TYPE_LABELS: Record<string, string> = {
   'runtime-event': 'event',
@@ -30,6 +49,7 @@ const TYPE_LABELS: Record<string, string> = {
   'session': 'session',
   'task': 'task',
   'daily-entry': 'daily',
+  'audit-snapshot': 'snapshot',
 };
 
 /**
@@ -40,12 +60,16 @@ const TYPE_LABELS: Record<string, string> = {
  * guard, approval, tool, blocker, and result blocks when they are linked.
  */
 export async function exportAuditTrail(options: ExportAuditTrailOptions): Promise<string> {
+  return renderTrail(options.startRef, await collectAuditTrailBlocks(options));
+}
+
+export async function collectAuditTrailBlocks(options: ExportAuditTrailOptions): Promise<AuditTrailBlock[]> {
   const maxDepth = options.maxDepth ?? DEFAULT_MAX_DEPTH;
   const start = await options.memory.getBlock(options.startRef);
   if (!start) throw new Error(`Audit start block not found: ${formatRef(options.startRef)}`);
 
   const visited = new Set<string>();
-  const blocks: Array<{ block: HeaperBlock; depth: number }> = [];
+  const blocks: AuditTrailBlock[] = [];
   const queue: Array<{ ref: BlockRef; depth: number }> = [{ ref: options.startRef, depth: 0 }];
 
   while (queue.length > 0) {
@@ -64,13 +88,54 @@ export async function exportAuditTrail(options: ExportAuditTrailOptions): Promis
     }
   }
 
-  const sorted = blocks.sort((a, b) => a.depth - b.depth || a.block.createdAt.localeCompare(b.block.createdAt) || a.block.id.localeCompare(b.block.id));
-  return renderTrail(options.startRef, sorted);
+  return blocks.sort((a, b) => a.depth - b.depth || a.block.createdAt.localeCompare(b.block.createdAt) || a.block.id.localeCompare(b.block.id));
+}
+
+export async function createAuditSnapshot(options: CreateAuditSnapshotOptions): Promise<HeaperBlock> {
+  const blocks = await collectAuditTrailBlocks(options);
+  const maxChars = options.maxChars ?? DEFAULT_SNAPSHOT_MAX_CHARS;
+  const fullText = renderTrail(options.startRef, blocks);
+  const content = truncate(fullText, maxChars);
+  const sourceRefs = blocks.map(({ block }) => refFor(block));
+  return options.memory.createBlock({
+    heap: options.snapshotHeap,
+    type: 'metadata',
+    data: {
+      startRef: options.startRef,
+      sourceRefs,
+      blockCount: blocks.length,
+      maxDepth: options.maxDepth ?? DEFAULT_MAX_DEPTH,
+      truncated: content.length < fullText.length,
+      content,
+    },
+    tags: ['audit-snapshot', `start:${options.startRef.id}`, `blocks:${blocks.length}`],
+    links: sourceRefs,
+    metadata: { source: 'audit-snapshot', preservesRawBlocks: true },
+  });
 }
 
 export async function runAuditExport(options: RunAuditExportOptions): Promise<string> {
   const memory = new LocalHeaperMemory({ filePath: options.storePath });
   return exportAuditTrail({ memory, startRef: parseBlockRef(options.ref), maxDepth: options.maxDepth });
+}
+
+export async function runAuditSnapshot(options: RunAuditSnapshotOptions): Promise<string> {
+  const memory = new LocalHeaperMemory({ filePath: options.storePath });
+  const snapshot = await createAuditSnapshot({
+    memory,
+    startRef: parseBlockRef(options.ref),
+    snapshotHeap: options.snapshotHeap,
+    maxDepth: options.maxDepth,
+    maxChars: options.maxChars,
+  });
+  return [
+    `Created audit snapshot ${formatRef(snapshot)}`,
+    `Source: ${options.ref}`,
+    `Blocks: ${snapshot.data.blockCount}`,
+    `Truncated: ${snapshot.data.truncated}`,
+    '',
+    String(snapshot.data.content ?? ''),
+  ].join('\n');
 }
 
 export function parseBlockRef(value: string): BlockRef {
@@ -85,7 +150,7 @@ async function neighborsFor(memory: HeaperMemory, block: HeaperBlock): Promise<B
   return dedupeRefs([...direct, ...reverse.map(refFor)]).sort(compareRefs);
 }
 
-function renderTrail(startRef: BlockRef, blocks: Array<{ block: HeaperBlock; depth: number }>): string {
+function renderTrail(startRef: BlockRef, blocks: AuditTrailBlock[]): string {
   return [
     `Audit trail from ${formatRef(startRef)}`,
     ...blocks.map(({ block, depth }) => renderBlock(block, depth)),
@@ -168,4 +233,9 @@ function dedupeRefs(refs: BlockRef[]): BlockRef[] {
     seen.add(key);
     return true;
   });
+}
+
+function truncate(text: string, maxChars: number): string {
+  if (text.length <= maxChars) return text;
+  return `${text.slice(0, Math.max(0, maxChars - 1))}…`;
 }
