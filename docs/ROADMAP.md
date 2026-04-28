@@ -66,7 +66,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 26 persona configuration loader.
 - [x] Add Slice 27 delegation/reference workflow.
 - [x] Add Slice 28 end-to-end smoke scenario.
-- [ ] Add Slice 29 runtime CLI smoke command.
+- [x] Add Slice 29 runtime CLI smoke command.
 - [ ] Add Slice 30 LocalHeaperMemory runtime wiring.
 - [ ] Add Slice 31 route/session store integration in orchestrator.
 - [ ] Add Slice 32 approval request integration in tool boundary.
@@ -407,7 +407,7 @@ Validation:
 
 Status: implemented in `src/runtime/e2e-smoke.test.ts`.
 
-### Slice 29 — Runtime CLI smoke command
+### Slice 29 — Runtime CLI smoke command ✅
 
 Goal: add a local CLI command that exercises the deterministic runtime smoke path without external services.
 
@@ -416,6 +416,8 @@ Validation:
 - uses fake agent/model fixtures only;
 - writes event/route/session/audit/tool-output blocks to a temp or configured local store;
 - prints linked refs and concise reply.
+
+Status: implemented in `src/cli/runtime-smoke.ts` with tests in `src/cli/runtime-smoke.test.ts`; exposed as `agent-core runtime-smoke <message>`.
 
 ### Slice 30 — LocalHeaperMemory runtime wiring
 

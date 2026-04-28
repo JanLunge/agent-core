@@ -27,6 +27,7 @@ import { Vault } from '../secrets/vault.js';
 import { AuditLog } from '../secrets/audit.js';
 import { SecretResolver } from '../secrets/resolver.js';
 import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
+import { runRuntimeSmoke } from './runtime-smoke.js';
 
 const program = new Command();
 
@@ -254,6 +255,27 @@ program
   .option('-d, --dir <path>', 'Base directory', '.')
   .action(async (opts) => {
     await runSetup(resolve(opts.dir));
+  });
+
+program
+  .command('runtime-smoke <message>')
+  .description('Run a deterministic local runtime smoke path without external services')
+  .option('-p, --persona <name>', 'Persona/agent name', 'mira')
+  .option('-s, --store <path>', 'Local HeaperMemory JSON store path')
+  .option('-c, --channel <id>', 'Synthetic channel id', 'local')
+  .action(async (message: string, opts: { persona: string; store?: string; channel: string }) => {
+    try {
+      const result = await runRuntimeSmoke({
+        message,
+        persona: opts.persona,
+        storePath: opts.store ? resolve(opts.store) : undefined,
+        channel: opts.channel,
+      });
+      console.log(result.lines.join('\n'));
+    } catch (err) {
+      console.error('Runtime smoke failed:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
   });
 
 const secrets = program.command('secrets').description('Manage encrypted secrets vault');
