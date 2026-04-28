@@ -30,6 +30,7 @@ export interface ClassifyRuntimeBlockerInput {
   nextAction?: string;
   sessionRef?: BlockRef;
   taskRef?: BlockRef;
+  originRefs?: BlockRef[];
 }
 
 export interface CreateRuntimeBlockerInput extends ClassifyRuntimeBlockerInput {
@@ -72,7 +73,7 @@ export function classifyRuntimeBlocker(input: ClassifyRuntimeBlockerInput): Runt
 
 export async function createRuntimeBlockerBlock(input: CreateRuntimeBlockerInput): Promise<HeaperBlock<RuntimeBlockerData>> {
   const data = classifyRuntimeBlocker(input);
-  const links = [input.sessionRef, input.taskRef].filter((ref): ref is BlockRef => Boolean(ref));
+  const links = dedupeRefs([input.sessionRef, input.taskRef, ...(input.originRefs ?? [])].filter((ref): ref is BlockRef => Boolean(ref)));
 
   return (await input.memory.createBlock({
     heap: input.heap,
@@ -158,6 +159,16 @@ function titleFor(kind: RuntimeBlockerKind): string {
     case 'tool-failure':
       return 'Tool failure';
   }
+}
+
+function dedupeRefs(refs: BlockRef[]): BlockRef[] {
+  const seen = new Set<string>();
+  return refs.filter((ref) => {
+    const key = `${ref.heap}#${ref.id}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function nextActionFor(kind: RuntimeBlockerKind): string {

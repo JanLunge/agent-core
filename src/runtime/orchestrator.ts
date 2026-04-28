@@ -7,6 +7,7 @@ import type { Message } from '../llm/types.js';
 import type { Router, RoutingDecision } from '../router/router.js';
 import { storeRouteDecision } from '../router/route-history.js';
 import { decideNotification, type NotificationIntent, type NotificationTrigger } from '../notifications/policy.js';
+import { createRuntimeBlockerBlock } from './blockers.js';
 import { decideGuard, type GuardDecision, type GuardRequest } from '../tools/guard.js';
 
 export interface RuntimeResponderInput {
@@ -25,6 +26,7 @@ export interface RunRuntimeEventInput {
   memory: HeaperMemory;
   sessionHeap: HeapName;
   auditHeap: HeapName;
+  blockerHeap?: HeapName;
   modelPolicy: ModelRoutingPolicy;
   availableModels: AvailableModel[];
   complexity?: TaskComplexity;
@@ -38,6 +40,7 @@ export interface RuntimeOutcome {
   routeRef: BlockRef;
   modelDecisionRef: BlockRef;
   guardDecisionRefs: BlockRef[];
+  blockerRefs: BlockRef[];
   userMessageRef: BlockRef;
   assistantMessageRef: BlockRef;
   notificationIntent: NotificationIntent;
@@ -46,6 +49,18 @@ export interface RuntimeOutcome {
   route: RoutingDecision;
   model: ModelRoutingDecision;
   guardDecisions: GuardDecision[];
+}
+
+export class RuntimeBlockedError extends Error {
+  constructor(
+    message: string,
+    readonly blockerRef: BlockRef,
+    readonly notificationIntent: NotificationIntent,
+    readonly cause?: unknown,
+  ) {
+    super(message);
+    this.name = 'RuntimeBlockedError';
+  }
 }
 
 /**
@@ -57,6 +72,7 @@ export interface RuntimeOutcome {
  * and assistant message blocks by reference.
  */
 export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<RuntimeOutcome> {
+  const blockerHeap = input.blockerHeap ?? input.auditHeap;
   const eventBlock = await input.memory.createBlock({
     heap: input.auditHeap,
     type: 'metadata',
@@ -93,14 +109,28 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     heaps: [input.sessionHeap, input.auditHeap],
   });
 
-  const model = routeModel({
-    taskType: input.event.routing.taskType ?? input.event.source,
-    persona: route.persona,
-    sensitivity: route.sensitivity,
-    complexity: input.complexity ?? 'medium',
-    availableModels: input.availableModels,
-    policy: input.modelPolicy,
-  });
+  let model: ModelRoutingDecision;
+  try {
+    model = routeModel({
+      taskType: input.event.routing.taskType ?? input.event.source,
+      persona: route.persona,
+      sensitivity: route.sensitivity,
+      complexity: input.complexity ?? 'medium',
+      availableModels: input.availableModels,
+      policy: input.modelPolicy,
+    });
+  } catch (err) {
+    const blocker = await createRuntimeBlockerBlock({
+      memory: input.memory,
+      heap: blockerHeap,
+      error: err,
+      operation: 'route model for runtime event',
+      sessionRef: refFor(sessionBlock),
+      originRefs: [refFor(eventBlock), refFor(routeBlock)],
+    });
+    throw runtimeBlocked(input.event, blocker, [refFor(eventBlock), refFor(routeBlock), refFor(blocker)], err, 'blocked');
+  }
+
   const modelBlock = await input.memory.createBlock({
     heap: input.auditHeap,
     type: 'metadata',
@@ -124,21 +154,53 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     }));
   }
 
+  const blockerBlocks: HeaperBlock[] = [];
+  for (const guard of guardDecisions.filter((decision) => decision.disposition === 'deny')) {
+    blockerBlocks.push(await createRuntimeBlockerBlock({
+      memory: input.memory,
+      heap: blockerHeap,
+      error: guard.reason,
+      operation: `guard denied ${guard.request.action} ${guard.request.target}`,
+      sessionRef: refFor(sessionBlock),
+      originRefs: [refFor(eventBlock), refFor(routeBlock), ...guardBlocks.map(refFor)],
+    }));
+  }
+
   const userMessage = await sessionStore.appendMessage(
     route.sessionId,
     { role: 'user', content: input.event.content, timestamp: input.event.receivedAt },
-    [refFor(eventBlock), refFor(routeBlock)],
+    [refFor(eventBlock), refFor(routeBlock), ...blockerBlocks.map(refFor)],
   );
 
-  const reply = await (input.responder ?? defaultResponder)({ event: input.event, route, workingMemory, model, guardDecisions });
+  let reply: string;
+  try {
+    reply = await (input.responder ?? defaultResponder)({ event: input.event, route, workingMemory, model, guardDecisions });
+  } catch (err) {
+    const blocker = await createRuntimeBlockerBlock({
+      memory: input.memory,
+      heap: blockerHeap,
+      error: err,
+      operation: 'run runtime responder',
+      sessionRef: refFor(sessionBlock),
+      originRefs: [refFor(eventBlock), refFor(routeBlock), refFor(modelBlock), refFor(userMessage), ...guardBlocks.map(refFor), ...blockerBlocks.map(refFor)],
+    });
+    throw runtimeBlocked(
+      input.event,
+      blocker,
+      [refFor(eventBlock), refFor(routeBlock), refFor(modelBlock), refFor(userMessage), refFor(blocker)],
+      err,
+      'failed',
+    );
+  }
+
   const assistantMessage = await sessionStore.appendMessage(
     route.sessionId,
     { role: 'assistant', content: reply },
-    [refFor(userMessage), refFor(routeBlock), refFor(modelBlock), ...guardBlocks.map(refFor)],
+    [refFor(userMessage), refFor(routeBlock), refFor(modelBlock), ...guardBlocks.map(refFor), ...blockerBlocks.map(refFor)],
   );
   const notificationIntent = decideNotification({
     mode: input.event.modeHint,
-    trigger: notificationTriggerFor(input.event.modeHint, guardDecisions),
+    trigger: notificationTriggerFor(input.event.modeHint, guardDecisions, blockerBlocks.map(refFor)),
     summary: reply,
     refs: [
       refFor(eventBlock),
@@ -147,6 +209,7 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
       refFor(userMessage),
       refFor(assistantMessage),
       ...guardBlocks.map(refFor),
+      ...blockerBlocks.map(refFor),
     ],
   });
 
@@ -155,6 +218,7 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     routeRef: refFor(routeBlock),
     modelDecisionRef: refFor(modelBlock),
     guardDecisionRefs: guardBlocks.map(refFor),
+    blockerRefs: blockerBlocks.map(refFor),
     userMessageRef: refFor(userMessage),
     assistantMessageRef: refFor(assistantMessage),
     notificationIntent,
@@ -166,8 +230,25 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
   };
 }
 
-function notificationTriggerFor(mode: NormalizedEvent['modeHint'], guardDecisions: GuardDecision[]): NotificationTrigger {
+function runtimeBlocked(
+  event: NormalizedEvent,
+  blocker: HeaperBlock,
+  refs: BlockRef[],
+  cause: unknown,
+  trigger: Extract<NotificationTrigger, 'blocked' | 'failed'>,
+): RuntimeBlockedError {
+  const notificationIntent = decideNotification({
+    mode: event.modeHint,
+    trigger,
+    summary: String(blocker.data.details ?? blocker.data.title ?? 'Runtime blocked'),
+    refs,
+  });
+  return new RuntimeBlockedError(String(blocker.data.title ?? 'Runtime blocked'), refFor(blocker), notificationIntent, cause);
+}
+
+function notificationTriggerFor(mode: NormalizedEvent['modeHint'], guardDecisions: GuardDecision[], blockerRefs: BlockRef[] = []): NotificationTrigger {
   if (guardDecisions.some((guard) => guard.disposition === 'ask')) return 'approval-required';
+  if (blockerRefs.length > 0) return 'blocked';
   if (mode === 'live') return 'live-response';
   if (mode === 'background') return 'background-progress';
   return 'async-progress';

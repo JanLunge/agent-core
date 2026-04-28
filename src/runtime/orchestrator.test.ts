@@ -3,7 +3,7 @@ import type { AgentRuntime } from '../agent/agent.js';
 import { createBackgroundEvent, createChatEvent } from '../events/index.js';
 import { InMemoryHeaperMemory } from '../heaper/memory.js';
 import { createRouter } from '../router/router.js';
-import { runRuntimeEvent } from './orchestrator.js';
+import { RuntimeBlockedError, runRuntimeEvent } from './orchestrator.js';
 
 function fakeAgent(name: string): AgentRuntime {
   const sessions = new Map<string, { id: string }>();
@@ -267,10 +267,94 @@ describe('runRuntimeEvent', () => {
       { heap: 'agent/audit', id: 'block-5' },
       { heap: 'agent/audit', id: 'block-6' },
     ]);
+    expect(outcome.blockerRefs).toEqual([{ heap: 'agent/audit', id: 'block-7' }]);
     await expect(memory.getBlock(outcome.guardDecisionRefs[1])).resolves.toMatchObject({
       tags: ['guard-decision', 'disposition:deny', 'surface:api'],
       data: { guard: { reason: 'Sensitive mode blocks external/network operations.' } },
       links: [outcome.eventRef, outcome.routeRef],
+    });
+    await expect(memory.getBlock(outcome.blockerRefs[0])).resolves.toMatchObject({
+      tags: ['runtime-blocker', 'status:active', 'blocker-kind:denied-permission', 'severity:high', 'session:block-2'],
+      metadata: { redacted: true },
+      links: [{ heap: 'agent/sessions', id: 'block-2' }, outcome.eventRef, outcome.routeRef, ...outcome.guardDecisionRefs],
+    });
+  });
+
+  it('persists a blocker and throws a RuntimeBlockedError when model routing fails', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    let caught: unknown;
+    try {
+      await runRuntimeEvent({
+        event: createChatEvent({ channelType: 'signal', chatId: 'jan', text: '[sensitive] no local model available' }),
+        router,
+        memory,
+        sessionHeap: 'agent/sessions',
+        auditHeap: 'agent/audit',
+        blockerHeap: 'agent/blockers',
+        modelPolicy,
+        availableModels: [{ id: 'remote/default', capabilities: ['remote'] }],
+      });
+    } catch (err) {
+      caught = err;
+    }
+
+    expect(caught).toBeInstanceOf(RuntimeBlockedError);
+    const error = caught as RuntimeBlockedError;
+    expect(error.blockerRef).toEqual({ heap: 'agent/blockers', id: 'block-4' });
+    expect(error.notificationIntent).toMatchObject({
+      action: 'notify',
+      priority: 'high',
+      reason: 'A blocker needs human attention before work can continue.',
+      refs: [{ heap: 'agent/audit', id: 'block-1' }, { heap: 'agent/audit', id: 'block-3' }, error.blockerRef],
+    });
+    await expect(memory.getBlock(error.blockerRef)).resolves.toMatchObject({
+      tags: ['runtime-blocker', 'status:active', 'blocker-kind:tool-failure', 'severity:high', 'session:block-2'],
+      data: {
+        title: 'Tool failure',
+        details: 'Error: Sensitive task requires a local model, but no local-capable model is available',
+        operation: 'route model for runtime event',
+      },
+      metadata: { redacted: true },
+    });
+  });
+
+  it('persists a redacted blocker and throws when responder execution fails', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    await expect(runRuntimeEvent({
+      event: createBackgroundEvent({ taskId: 'task-fail', persona: 'mira', content: 'continue failing work' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      blockerHeap: 'agent/blockers',
+      modelPolicy,
+      availableModels,
+      responder: () => { throw new Error('tool crashed token=supersecret'); },
+    })).rejects.toMatchObject({
+      name: 'RuntimeBlockedError',
+      blockerRef: { heap: 'agent/blockers', id: 'block-6' },
+      notificationIntent: { action: 'notify', priority: 'high', reason: 'A failure needs attention or triage.' },
+    });
+
+    await expect(memory.getBlock({ heap: 'agent/blockers', id: 'block-6' })).resolves.toMatchObject({
+      data: {
+        kind: 'missing-credentials',
+        details: 'Error: tool crashed token=[REDACTED]',
+        operation: 'run runtime responder',
+      },
+      links: [
+        { heap: 'agent/sessions', id: 'block-2' },
+        { heap: 'agent/audit', id: 'block-1' },
+        { heap: 'agent/audit', id: 'block-3' },
+        { heap: 'agent/audit', id: 'block-4' },
+        { heap: 'agent/sessions', id: 'block-5' },
+      ],
     });
   });
 });

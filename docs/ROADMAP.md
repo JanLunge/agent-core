@@ -71,7 +71,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 31 route/session store integration in orchestrator.
 - [x] Add Slice 32 approval request integration in tool boundary.
 - [x] Add Slice 33 notification intents in runtime outcome.
-- [ ] Add Slice 34 blocker persistence on runtime failures.
+- [x] Add Slice 34 blocker persistence on runtime failures.
 - [ ] Add Slice 35 persona config integration into router/model defaults.
 - [ ] Add Slice 36 background worker uses LocalHeaperMemory.
 - [ ] Add Slice 37 daily continuity writes from completed runtime turns.
@@ -467,7 +467,7 @@ Validation:
 
 Status: implemented in `src/runtime/orchestrator.ts`; runtime outcomes now include a `notificationIntent` from the central notification policy, with linked event/route/model/message/guard refs and approval-required escalation for ask decisions.
 
-### Slice 34 — Blocker persistence on runtime failures
+### Slice 34 — Blocker persistence on runtime failures ✅
 
 Goal: convert runtime/tool/model failures into durable blocker blocks so work can resume instead of losing exceptions.
 
@@ -476,6 +476,8 @@ Validation:
 - denied permission can become blocked task/session state;
 - blocker refs appear in progress reports;
 - sensitive details are redacted.
+
+Status: implemented in `src/runtime/orchestrator.ts` and `src/runtime/blockers.ts`; model-routing and responder failures now persist redacted runtime-blocker blocks before throwing `RuntimeBlockedError`, denied guard decisions create blocker refs linked into the session trail, and notification intents surface blockers for human attention.
 
 ### Slice 35 — Persona config integration into router/model defaults
 

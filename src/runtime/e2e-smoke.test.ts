@@ -109,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 33 — Notification intents in runtime outcome');
-    expect(report.text).toContain('Active slice: Slice 34 — Blocker persistence on runtime failures');
+    expect(report.text).toContain('Completed slice: Slice 34 — Blocker persistence on runtime failures');
+    expect(report.text).toContain('Active slice: Slice 35 — Persona config integration into router/model defaults');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {
@@ -144,7 +144,7 @@ describe('end-to-end runtime smoke scenario', () => {
       links: [outcome.eventRef, outcome.routeRef],
     });
     await expect(memory.getBlock(outcome.assistantMessageRef)).resolves.toMatchObject({
-      links: [{ heap: 'persona/mira/sessions', id: 'smoke-2' }, outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef, outcome.guardDecisionRefs[0]],
+      links: [{ heap: 'persona/mira/sessions', id: 'smoke-2' }, outcome.userMessageRef, outcome.routeRef, outcome.modelDecisionRef, outcome.guardDecisionRefs[0], outcome.blockerRefs[0]],
     });
   });
 });

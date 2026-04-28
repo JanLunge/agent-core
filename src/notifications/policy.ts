@@ -38,10 +38,6 @@ export function decideNotification(input: NotificationPolicyInput): Notification
   const refs = dedupeRefs(input.refs ?? []);
   const audience = input.audience ?? 'human';
 
-  if (input.mode === 'live') {
-    return intent('direct-response', 'normal', 'Live chat expects an immediate direct response.', input.summary, refs, audience);
-  }
-
   if (input.trigger === 'blocked') {
     return intent('notify', 'high', 'A blocker needs human attention before work can continue.', input.summary, refs, audience);
   }
@@ -52,6 +48,10 @@ export function decideNotification(input: NotificationPolicyInput): Notification
 
   if (input.trigger === 'approval-required') {
     return intent('notify', 'high', 'An explicit approval decision is required.', input.summary, refs, audience);
+  }
+
+  if (input.mode === 'live') {
+    return intent('direct-response', 'normal', 'Live chat expects an immediate direct response.', input.summary, refs, audience);
   }
 
   if (input.trigger === 'completed-milestone') {
