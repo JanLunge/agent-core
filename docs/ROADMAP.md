@@ -72,7 +72,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 32 approval request integration in tool boundary.
 - [x] Add Slice 33 notification intents in runtime outcome.
 - [x] Add Slice 34 blocker persistence on runtime failures.
-- [ ] Add Slice 35 persona config integration into router/model defaults.
+- [x] Add Slice 35 persona config integration into router/model defaults.
 - [ ] Add Slice 36 background worker uses LocalHeaperMemory.
 - [ ] Add Slice 37 daily continuity writes from completed runtime turns.
 - [ ] Add Slice 38 real-run audit export command.
@@ -479,7 +479,7 @@ Validation:
 
 Status: implemented in `src/runtime/orchestrator.ts` and `src/runtime/blockers.ts`; model-routing and responder failures now persist redacted runtime-blocker blocks before throwing `RuntimeBlockedError`, denied guard decisions create blocker refs linked into the session trail, and notification intents surface blockers for human attention.
 
-### Slice 35 — Persona config integration into router/model defaults
+### Slice 35 — Persona config integration into router/model defaults ✅
 
 Goal: feed loaded persona config into routing, heap selection, and model defaults deterministically.
 
@@ -488,6 +488,8 @@ Validation:
 - persona default heaps select session/tool/memory heaps;
 - persona model defaults affect model routing;
 - invalid config fails closed with a blocker/diagnostic.
+
+Status: implemented in `src/runtime/orchestrator.ts`; runtime can load persona config blocks before model routing, use persona session/shared heaps for working memory, merge persona model defaults into routing policy, and persist a blocker when config validation fails.
 
 ### Slice 36 — Background worker uses LocalHeaperMemory
 

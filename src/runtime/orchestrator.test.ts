@@ -183,6 +183,84 @@ describe('runRuntimeEvent', () => {
     expect(observedWorkingMemory).toContain('what did I ask you to remember?');
   });
 
+  it('loads persona config before model routing and uses persona session heap/default model', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+    await memory.createBlock({
+      heap: 'agent/personas',
+      type: 'metadata',
+      data: {
+        id: 'mira',
+        name: 'Mira',
+        heaps: { sessions: 'persona/mira/custom-sessions', shared: ['agent/shared-context'] },
+        modelDefaults: { defaultModel: 'remote/persona-default' },
+      },
+      tags: ['persona-config', 'persona:mira'],
+    });
+    await memory.createBlock({ heap: 'agent/shared-context', type: 'text', data: { content: '@mira use persona config shared persona context' }, tags: ['seed'] });
+
+    let observedWorkingMemory = '';
+    const outcome = await runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-persona', channelType: 'telegram', chatId: 'jan', text: '@mira use persona config' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      personaConfigHeap: 'agent/personas',
+      modelPolicy,
+      availableModels: [...availableModels, { id: 'remote/persona-default', capabilities: ['remote'] }],
+      responder: ({ workingMemory }) => {
+        observedWorkingMemory = workingMemory.text;
+        return 'persona configured';
+      },
+    });
+
+    expect(outcome.personaConfig).toMatchObject({ id: 'mira', source: 'heaper' });
+    expect(outcome.sessionHeap).toBe('persona/mira/custom-sessions');
+    expect(outcome.model).toMatchObject({ model: 'remote/persona-default', reason: 'persona-default' });
+    expect(outcome.userMessageRef.heap).toBe('persona/mira/custom-sessions');
+    expect(observedWorkingMemory).toContain('shared persona context');
+  });
+
+  it('fails closed with a persisted blocker when persona config is invalid', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+    await memory.createBlock({
+      heap: 'agent/personas',
+      type: 'metadata',
+      data: { id: 'other', name: 'Other' },
+      tags: ['persona-config', 'persona:mira'],
+    });
+
+    await expect(runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-invalid-persona', channelType: 'telegram', chatId: 'jan', text: '@mira hello' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      blockerHeap: 'agent/blockers',
+      personaConfigHeap: 'agent/personas',
+      modelPolicy,
+      availableModels,
+    })).rejects.toMatchObject({
+      name: 'RuntimeBlockedError',
+      blockerRef: { heap: 'agent/blockers', id: 'block-3' },
+      notificationIntent: { action: 'notify', reason: 'A blocker needs human attention before work can continue.' },
+    });
+
+    await expect(memory.getBlock({ heap: 'agent/blockers', id: 'block-3' })).resolves.toMatchObject({
+      tags: ['runtime-blocker', 'status:active', 'blocker-kind:tool-failure', 'severity:high'],
+      data: {
+        operation: 'load persona config for mira',
+        details: 'Error: Persona config id mismatch: expected mira, got other',
+      },
+      links: [{ heap: 'agent/audit', id: 'block-2' }],
+      metadata: { redacted: true },
+    });
+  });
+
   it('keeps ordinary background progress silent in the runtime notification intent', async () => {
     const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
     const router = createRouter();

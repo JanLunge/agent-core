@@ -2,6 +2,7 @@ import type { NormalizedEvent } from '../events/index.js';
 import type { BlockRef, HeapName, HeaperBlock, HeaperMemory } from '../heaper/types.js';
 import { routeModel, type AvailableModel, type ModelRoutingDecision, type ModelRoutingPolicy, type TaskComplexity } from '../llm/model-routing.js';
 import { HeaperSessionStore } from '../conversation/heaper-session-store.js';
+import { loadPersonaConfig, personaConfigToModelDefaults, type PersonaConfig } from '../heaper/persona-config.js';
 import { selectWorkingMemory, type WorkingMemoryBundle } from '../conversation/working-memory.js';
 import type { Message } from '../llm/types.js';
 import type { Router, RoutingDecision } from '../router/router.js';
@@ -27,6 +28,7 @@ export interface RunRuntimeEventInput {
   sessionHeap: HeapName;
   auditHeap: HeapName;
   blockerHeap?: HeapName;
+  personaConfigHeap?: HeapName;
   modelPolicy: ModelRoutingPolicy;
   availableModels: AvailableModel[];
   complexity?: TaskComplexity;
@@ -41,6 +43,8 @@ export interface RuntimeOutcome {
   modelDecisionRef: BlockRef;
   guardDecisionRefs: BlockRef[];
   blockerRefs: BlockRef[];
+  personaConfig?: PersonaConfig;
+  sessionHeap: HeapName;
   userMessageRef: BlockRef;
   assistantMessageRef: BlockRef;
   notificationIntent: NotificationIntent;
@@ -81,7 +85,24 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
   });
 
   const route = input.router.planEvent(input.event);
-  const sessionStore = new HeaperSessionStore({ memory: input.memory, sessionHeap: input.sessionHeap });
+  const personaName = route.persona ?? route.agentName;
+  let personaConfig: PersonaConfig | undefined;
+  try {
+    personaConfig = input.personaConfigHeap
+      ? await loadPersonaConfig({ persona: personaName, memory: input.memory, heap: input.personaConfigHeap })
+      : undefined;
+  } catch (err) {
+    const blocker = await createRuntimeBlockerBlock({
+      memory: input.memory,
+      heap: blockerHeap,
+      error: err,
+      operation: `load persona config for ${personaName}`,
+      originRefs: [refFor(eventBlock)],
+    });
+    throw runtimeBlocked(input.event, blocker, [refFor(eventBlock), refFor(blocker)], err, 'blocked');
+  }
+  const activeSessionHeap = personaConfig?.defaultHeaps.sessions ?? input.sessionHeap;
+  const sessionStore = new HeaperSessionStore({ memory: input.memory, sessionHeap: activeSessionHeap });
   const sessionBlock = await sessionStore.createOrResume({
     sessionId: route.sessionId,
     agentName: route.agentName,
@@ -106,18 +127,24 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     memory: input.memory,
     history,
     query: input.event.content,
-    heaps: [input.sessionHeap, input.auditHeap],
+    heaps: [activeSessionHeap, ...(personaConfig?.defaultHeaps.shared ?? []), input.auditHeap],
   });
 
   let model: ModelRoutingDecision;
   try {
     model = routeModel({
       taskType: input.event.routing.taskType ?? input.event.source,
-      persona: route.persona,
+      persona: personaConfig?.id ?? route.persona,
       sensitivity: route.sensitivity,
       complexity: input.complexity ?? 'medium',
       availableModels: input.availableModels,
-      policy: input.modelPolicy,
+      policy: {
+        ...input.modelPolicy,
+        personaDefaults: {
+          ...(input.modelPolicy.personaDefaults ?? {}),
+          ...(personaConfig ? personaConfigToModelDefaults(personaConfig) : {}),
+        },
+      },
     });
   } catch (err) {
     const blocker = await createRuntimeBlockerBlock({
@@ -219,6 +246,8 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     modelDecisionRef: refFor(modelBlock),
     guardDecisionRefs: guardBlocks.map(refFor),
     blockerRefs: blockerBlocks.map(refFor),
+    personaConfig,
+    sessionHeap: activeSessionHeap,
     userMessageRef: refFor(userMessage),
     assistantMessageRef: refFor(assistantMessage),
     notificationIntent,
