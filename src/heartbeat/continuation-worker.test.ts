@@ -5,7 +5,21 @@ import { describe, expect, it } from 'vitest';
 import { createTaskBlock, transitionTaskBlock } from '../heaper/task-blocks.js';
 import { InMemoryHeaperMemory } from '../heaper/memory.js';
 import { LocalHeaperMemory } from '../heaper/local-storage.js';
-import { runContinuationWorker } from './continuation-worker.js';
+import { createRouter } from '../router/router.js';
+import { createFakeAgentHarness } from '../runtime/fake-agent.js';
+import { createRuntimeContinuationHandler, runContinuationWorker } from './continuation-worker.js';
+
+const modelPolicy = {
+  defaultModel: 'remote/default',
+  strongModel: 'remote/strong',
+  localModel: 'local/small',
+};
+
+const availableModels = [
+  { id: 'local/small', capabilities: ['local' as const] },
+  { id: 'remote/default', capabilities: ['remote' as const] },
+  { id: 'remote/strong', capabilities: ['remote' as const, 'strong' as const] },
+];
 
 describe('runContinuationWorker', () => {
   it('selects pending tasks, writes result blocks, links them, and marks done', async () => {
@@ -114,6 +128,105 @@ describe('runContinuationWorker', () => {
       status: 'blocked',
       statusReason: 'needs product decision',
       blockerRefs: [{ heap: 'agent/results', id: 'block-3' }],
+    });
+  });
+
+  it('bridges a task into the runtime orchestrator and links runtime refs back to the task result', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'runtime', now: () => '2026-04-28T19:00:00.000Z' });
+    const router = createRouter();
+    const harness = createFakeAgentHarness('mira', [{ kind: 'echo', prefix: 'runtime-task' }]);
+    router.registerAgent('mira', harness.agent);
+    router.setDefaultAgent('mira');
+    const task = await createTaskBlock({
+      memory,
+      heap: 'agent/tasks',
+      title: 'Runtime task',
+      description: 'summarize background work',
+      taskType: 'heartbeat',
+      owner: { kind: 'persona', name: 'mira' },
+    });
+
+    const result = await runContinuationWorker({
+      memory,
+      taskHeaps: ['agent/tasks'],
+      resultHeap: 'agent/results',
+      now: '2026-04-28T19:01:00.000Z',
+      handleTask: createRuntimeContinuationHandler({
+        memory,
+        router,
+        sessionHeap: 'agent/sessions',
+        auditHeap: 'agent/audit',
+        modelPolicy,
+        availableModels,
+        responder: harness.responder,
+        notify: true,
+      }),
+    });
+
+    expect(result.processed).toMatchObject([{ taskRef: { heap: 'agent/tasks', id: task.id }, status: 'done' }]);
+    expect(result.notifications).toMatchObject([{ action: 'notify', message: 'runtime-task:summarize background work' }]);
+    const resultRef = result.processed[0].resultRef;
+    const resultBlock = await memory.getBlock(resultRef);
+    expect(resultBlock).toMatchObject({
+      data: {
+        status: 'done',
+        summary: 'runtime-task:summarize background work',
+        runtimeRefs: expect.arrayContaining([
+          expect.objectContaining({ heap: 'agent/audit' }),
+          expect.objectContaining({ heap: 'agent/sessions' }),
+        ]),
+      },
+      links: expect.arrayContaining([{ heap: 'agent/tasks', id: task.id }]),
+    });
+    const runtimeRefs = resultBlock?.data.runtimeRefs as Array<{ heap: string; id: string }>;
+    expect(runtimeRefs.some((ref) => ref.heap === 'agent/audit')).toBe(true);
+    expect(runtimeRefs.some((ref) => ref.heap === 'agent/sessions')).toBe(true);
+    const updatedTask = await memory.getBlock(task);
+    expect(updatedTask?.data).toMatchObject({ status: 'done', resultRefs: [resultRef] });
+  });
+
+  it('links runtime blockers back to the task when runtime orchestration blocks', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'blocked', now: () => '2026-04-28T19:02:00.000Z' });
+    const router = createRouter();
+    const harness = createFakeAgentHarness('mira', [{ kind: 'echo', prefix: 'runtime-task' }]);
+    router.registerAgent('mira', harness.agent);
+    router.setDefaultAgent('mira');
+    const task = await createTaskBlock({
+      memory,
+      heap: 'agent/tasks',
+      title: 'Blocked runtime task',
+      description: 'blocked by missing model',
+      taskType: 'heartbeat',
+      owner: { kind: 'agent', name: 'mira' },
+    });
+
+    const result = await runContinuationWorker({
+      memory,
+      taskHeaps: ['agent/tasks'],
+      resultHeap: 'agent/results',
+      blockerHeap: 'agent/blockers',
+      handleTask: createRuntimeContinuationHandler({
+        memory,
+        router,
+        sessionHeap: 'agent/sessions',
+        auditHeap: 'agent/audit',
+        blockerHeap: 'agent/blockers',
+        modelPolicy,
+        availableModels: [],
+        responder: harness.responder,
+      }),
+    });
+
+    expect(result.processed).toMatchObject([{ taskRef: { heap: 'agent/tasks', id: task.id }, status: 'blocked', blockerRef: { heap: 'agent/blockers', id: expect.any(String) } }]);
+    const blockerRef = result.processed[0].blockerRef!;
+    const updatedTask = await memory.getBlock(task);
+    expect(updatedTask?.data).toMatchObject({
+      status: 'blocked',
+      blockerRefs: [blockerRef],
+    });
+    await expect(memory.getBlock(blockerRef)).resolves.toMatchObject({
+      tags: expect.arrayContaining(['runtime-blocker']),
+      links: expect.arrayContaining([{ heap: 'agent/tasks', id: task.id }, result.processed[0].resultRef]),
     });
   });
 

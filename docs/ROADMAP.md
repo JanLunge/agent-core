@@ -79,7 +79,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 39 runtime audit export CLI fixture for Telegram spike stores.
 - [x] Add Slice 40 audit trail redaction policy tests for secret-like fields.
 - [x] Add Slice 41 resumable approval application flow.
-- [ ] Add Slice 42 task-to-runtime continuation bridge.
+- [x] Add Slice 42 task-to-runtime continuation bridge.
 - [ ] Add Slice 43 persona daily continuity startup injection.
 - [ ] Add Slice 44 route handoff scoring notes and scaffold.
 - [ ] Add Slice 45 durable notification outbox blocks.
@@ -570,7 +570,7 @@ Validation:
 
 Status: implemented in `src/tools/approval-requests.ts`; approved requests can now create `approval-resume` task blocks, transition to applied with resume refs, and link session/result refs while denied/cancelled requests remain non-resumable.
 
-### Slice 42 — Task-to-runtime continuation bridge
+### Slice 42 — Task-to-runtime continuation bridge ✅
 
 Goal: let background tasks invoke the runtime orchestrator with task/session refs instead of custom handlers only.
 
@@ -578,6 +578,8 @@ Validation:
 - task content becomes a background normalized event;
 - runtime outcome result refs link back to task;
 - blocked runtime errors persist task blocker refs.
+
+Status: implemented in `src/heartbeat/continuation-worker.ts`; `createRuntimeContinuationHandler` converts task blocks into background runtime events, stores runtime refs in task-result blocks, links those refs back to the result/task, and attaches runtime blocker refs when orchestration blocks.
 
 ### Slice 43 — Persona daily continuity startup injection
 

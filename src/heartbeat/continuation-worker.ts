@@ -1,6 +1,8 @@
+import { createBackgroundEvent } from '../events/index.js';
 import type { BlockRef, HeapName, HeaperBlock, HeaperMemory } from '../heaper/types.js';
 import { decideNotification, type NotificationIntent } from '../notifications/policy.js';
 import { createRuntimeBlockerBlock } from '../runtime/blockers.js';
+import { RuntimeBlockedError, runRuntimeEvent, type RunRuntimeEventInput } from '../runtime/orchestrator.js';
 import {
   linkTaskBlocker,
   linkTaskResult,
@@ -10,9 +12,9 @@ import {
 } from '../heaper/task-blocks.js';
 
 export type TaskHandlerOutcome =
-  | { status: 'done'; summary: string; notify?: boolean }
-  | { status: 'blocked'; summary: string; reason: string; notify?: boolean }
-  | { status: 'running'; summary: string; notify?: boolean };
+  | { status: 'done'; summary: string; notify?: boolean; refs?: BlockRef[] }
+  | { status: 'blocked'; summary: string; reason: string; notify?: boolean; refs?: BlockRef[]; blockerRef?: BlockRef }
+  | { status: 'running'; summary: string; notify?: boolean; refs?: BlockRef[] };
 
 export interface ContinuationHandlerContext {
   memory: HeaperMemory;
@@ -20,6 +22,10 @@ export interface ContinuationHandlerContext {
 }
 
 export type ContinuationTaskHandler = (context: ContinuationHandlerContext) => Promise<TaskHandlerOutcome> | TaskHandlerOutcome;
+
+export interface RuntimeContinuationHandlerInput extends Omit<RunRuntimeEventInput, 'event'> {
+  notify?: boolean;
+}
 
 export interface RunContinuationWorkerInput {
   memory: HeaperMemory;
@@ -65,6 +71,7 @@ export async function runContinuationWorker(input: RunContinuationWorkerInput): 
       : await transitionTaskBlock({ memory: input.memory, task, status: 'running', reason: 'continuation worker picked task', now });
 
     const outcome = await input.handleTask({ memory: input.memory, task: running });
+    const outcomeRefs = outcome.refs ?? [];
     const resultBlock = await input.memory.createBlock({
       heap: input.resultHeap,
       type: 'text',
@@ -73,9 +80,10 @@ export async function runContinuationWorker(input: RunContinuationWorkerInput): 
         status: outcome.status,
         summary: outcome.summary,
         reason: outcome.status === 'blocked' ? outcome.reason : undefined,
+        runtimeRefs: outcomeRefs,
       },
       tags: ['task-result', `status:${outcome.status}`, `task:${running.id}`],
-      links: [refFor(running)],
+      links: dedupeRefs([refFor(running), ...outcomeRefs]),
       metadata: { source: 'continuation-worker', createdAt: now },
     });
 
@@ -85,16 +93,21 @@ export async function runContinuationWorker(input: RunContinuationWorkerInput): 
     if (outcome.status === 'done') {
       await transitionTaskBlock({ memory: input.memory, task: running, status: 'done', reason: outcome.summary, now });
     } else if (outcome.status === 'blocked') {
-      const blocker = await createRuntimeBlockerBlock({
-        memory: input.memory,
-        heap: input.blockerHeap ?? input.resultHeap,
-        error: outcome.reason,
-        operation: `continue task ${running.id}`,
-        taskRef: refFor(running),
-        originRefs: [refFor(resultBlock)],
-        nextAction: outcome.reason,
-      });
-      blockerRef = refFor(blocker);
+      if (outcome.blockerRef) {
+        blockerRef = outcome.blockerRef;
+        await input.memory.linkBlocks(blockerRef, refFor(resultBlock));
+      } else {
+        const blocker = await createRuntimeBlockerBlock({
+          memory: input.memory,
+          heap: input.blockerHeap ?? input.resultHeap,
+          error: outcome.reason,
+          operation: `continue task ${running.id}`,
+          taskRef: refFor(running),
+          originRefs: [refFor(resultBlock), ...outcomeRefs],
+          nextAction: outcome.reason,
+        });
+        blockerRef = refFor(blocker);
+      }
       await linkTaskBlocker({ memory: input.memory, task: running, blocker: blockerRef });
       await transitionTaskBlock({ memory: input.memory, task: running, status: 'blocked', reason: outcome.reason, now });
     }
@@ -106,6 +119,50 @@ export async function runContinuationWorker(input: RunContinuationWorkerInput): 
   }
 
   return result;
+}
+
+export function createRuntimeContinuationHandler(input: RuntimeContinuationHandlerInput): ContinuationTaskHandler {
+  return async ({ task }) => {
+    const event = createBackgroundEvent({
+      taskId: task.id,
+      content: task.data.description || task.data.title,
+      taskType: task.data.taskType,
+      persona: task.data.owner.kind === 'persona' || task.data.owner.kind === 'agent' ? task.data.owner.name : undefined,
+      sensitive: task.tags.includes('sensitive') || task.tags.includes('sensitivity:sensitive'),
+      metadata: { taskRef: refFor(task) },
+    });
+
+    try {
+      const outcome = await runRuntimeEvent({ ...input, event });
+      const refs = runtimeRefs(outcome);
+      return { status: 'done', summary: outcome.reply, notify: input.notify, refs };
+    } catch (err) {
+      if (err instanceof RuntimeBlockedError) {
+        return {
+          status: 'blocked',
+          summary: err.message,
+          reason: err.message,
+          refs: err.notificationIntent.refs,
+          blockerRef: err.blockerRef,
+          notify: true,
+        };
+      }
+      throw err;
+    }
+  };
+}
+
+function runtimeRefs(outcome: Awaited<ReturnType<typeof runRuntimeEvent>>): BlockRef[] {
+  return dedupeRefs([
+    outcome.eventRef,
+    outcome.routeRef,
+    outcome.modelDecisionRef,
+    outcome.userMessageRef,
+    outcome.assistantMessageRef,
+    ...outcome.guardDecisionRefs,
+    ...outcome.blockerRefs,
+    ...(outcome.dailyContinuityRef ? [outcome.dailyContinuityRef] : []),
+  ]);
 }
 
 function notificationFor(outcome: TaskHandlerOutcome, taskRef: BlockRef, refs: BlockRef[]): NotificationIntent {
@@ -120,4 +177,16 @@ function notificationFor(outcome: TaskHandlerOutcome, taskRef: BlockRef, refs: B
 
 function refFor(block: HeaperBlock): BlockRef {
   return { heap: block.heap, id: block.id };
+}
+
+function dedupeRefs(refs: BlockRef[]): BlockRef[] {
+  const seen = new Set<string>();
+  const result: BlockRef[] = [];
+  for (const ref of refs) {
+    const key = `${ref.heap}#${ref.id}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    result.push({ heap: ref.heap, id: ref.id });
+  }
+  return result;
 }
