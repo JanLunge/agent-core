@@ -1,4 +1,4 @@
-import { join } from 'node:path';
+import { basename, join } from 'node:path';
 import { homedir } from 'node:os';
 
 export interface DirectFileWriteIntent {
@@ -8,10 +8,22 @@ export interface DirectFileWriteIntent {
   description: string;
 }
 
+export interface DirectFileDeleteIntent {
+  kind: 'file-delete';
+  path: string;
+  description: string;
+}
+
+export type DirectFileIntent = DirectFileWriteIntent | DirectFileDeleteIntent;
+
 /**
  * Tiny deterministic bridge for early production testing while the full runtime
  * tool planner is being wired into normal Telegram operation.
  */
+export function parseDirectFileIntent(text: string): DirectFileIntent | undefined {
+  return parseDirectFileDeleteIntent(text) ?? parseDirectFileWriteIntent(text);
+}
+
 export function parseDirectFileWriteIntent(text: string): DirectFileWriteIntent | undefined {
   const normalized = text.trim();
   const lower = normalized.toLowerCase();
@@ -33,6 +45,42 @@ export function parseDirectFileWriteIntent(text: string): DirectFileWriteIntent 
     content: `# ${titleFromName(safeBaseName)}\n\nCreated by agent-core after Telegram approval.\n`,
     description: `Create ${fileName} on the Desktop`,
   };
+}
+
+export function parseDirectFileDeleteIntent(text: string): DirectFileDeleteIntent | undefined {
+  const lower = text.trim().toLowerCase();
+  if (!/\b(remove|delete|trash)\b/.test(lower)) return undefined;
+
+  const explicitDesktop = /\bdesktop\b/.test(lower);
+  const fileName = extractFileName(lower);
+  if (!fileName) return undefined;
+
+  // For this early bridge, bare filenames are scoped to Desktop because the
+  // Telegram test flow creates and removes Desktop notes. Avoid arbitrary paths.
+  const path = join(homedir(), 'Desktop', fileName);
+  const location = explicitDesktop ? 'from the Desktop' : 'from the Desktop';
+
+  return {
+    kind: 'file-delete',
+    path,
+    description: `Move ${basename(path)} ${location} to Trash`,
+  };
+}
+
+function extractFileName(lower: string): string | undefined {
+  const explicit = lower.match(/\b([a-z0-9][a-z0-9_-]*\.(?:md|txt))\b/i)?.[1];
+  if (explicit) return sanitizeFileName(explicit);
+
+  const named = lower.match(/\b(?:remove|delete|trash)\s+(?:the\s+)?([a-z0-9][a-z0-9_-]*)\b/i)?.[1];
+  if (!named || ['note', 'file'].includes(named)) return undefined;
+  return sanitizeFileName(`${named}.md`);
+}
+
+function sanitizeFileName(fileName: string): string {
+  const [rawBase, rawExt] = fileName.split(/\.(?=[^.]+$)/);
+  const base = (rawBase ?? 'note').replace(/[^a-z0-9_-]/gi, '-').replace(/^-+|-+$/g, '') || 'note';
+  const ext = rawExt === 'txt' ? 'txt' : 'md';
+  return `${base}.${ext}`;
 }
 
 function titleFromName(name: string): string {
