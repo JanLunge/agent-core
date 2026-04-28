@@ -1,13 +1,16 @@
-import { randomUUID } from 'node:crypto';
-import { mkdir, rename, writeFile } from 'node:fs/promises';
-import { basename, dirname, join } from 'node:path';
-import { homedir } from 'node:os';
 import { Bot, InlineKeyboard, type Context } from 'grammy';
 import type { Router, IncomingMessage } from '../../router/router.js';
 import type { StreamChunk } from '../../llm/types.js';
 import type { ApprovalResult } from '../../tools/approval.js';
 import { escapeMarkdownV2, splitMessage } from './format.js';
-import { parseDirectFileIntent, type DirectFileIntent } from './direct-intents.js';
+import { parseDirectOperationIntent } from './direct-intents.js';
+import {
+  executeApprovedOperation,
+  humanOperationKind,
+  OperationApprovalBroker,
+  renderOperationApproval,
+  type OperationIntent,
+} from '../../operations/approval.js';
 
 export interface TelegramConnectorOptions {
   token: string;
@@ -23,7 +26,7 @@ export class TelegramConnector {
   private router: Router;
   private allowedUsers: Set<number> | undefined;
   private allowedGroups: Set<number> | undefined;
-  private pendingFileApprovals = new Map<string, DirectFileIntent>();
+  private operationApprovals = new OperationApprovalBroker();
 
   constructor(options: TelegramConnectorOptions) {
     this.bot = new Bot(options.token);
@@ -100,9 +103,9 @@ export class TelegramConnector {
       if (!text.trim()) return;
 
       try {
-        const directIntent = parseDirectFileIntent(text);
-        if (directIntent) {
-          await this.requestFileApproval(ctx, directIntent);
+        const operation = parseDirectOperationIntent(text);
+        if (operation) {
+          await this.requestOperationApproval(ctx, operation);
           return;
         }
 
@@ -122,36 +125,32 @@ export class TelegramConnector {
   }
 
   private setupApprovalHandlers(): void {
-    this.bot.callbackQuery(/^file-(write|delete):(approve|deny):(.+)$/, async (ctx) => {
+    this.bot.callbackQuery(/^operation:(approve|deny):(.+)$/, async (ctx) => {
       if (!this.isAuthorised(ctx)) return;
-      const requestedKind = `file-${ctx.match[1]}`;
-      const action = ctx.match[2];
-      const id = ctx.match[3];
-      const intent = this.pendingFileApprovals.get(id);
-      if (!intent || intent.kind !== requestedKind) {
+      const action = ctx.match[1];
+      const id = ctx.match[2];
+      const operation = this.operationApprovals.take(id);
+      if (!operation) {
         await ctx.answerCallbackQuery({ text: 'Approval request expired or already handled.' }).catch(() => {});
         return;
       }
-      this.pendingFileApprovals.delete(id);
 
       if (action === 'deny') {
         await ctx.answerCallbackQuery({ text: 'Denied.' }).catch(() => {});
-        await ctx.editMessageText(`Denied: ${intent.description}\n${intent.path}`).catch(() => {});
+        await ctx.editMessageText(`Denied: ${operation.description}\n${operation.target}`).catch(() => {});
         return;
       }
 
       await ctx.answerCallbackQuery({ text: 'Approved.' }).catch(() => {});
       try {
-        const result = intent.kind === 'file-write'
-          ? await executeApprovedFileWrite(intent.path, intent.content)
-          : await executeApprovedFileDelete(intent.path);
-        await ctx.editMessageText(result).catch(async () => {
-          await ctx.reply(result);
+        const result = await executeApprovedOperation(operation);
+        await ctx.editMessageText(result.message).catch(async () => {
+          await ctx.reply(result.message);
         });
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        await ctx.editMessageText(`Approved, but file operation failed:\n${message}`).catch(async () => {
-          await ctx.reply(`Approved, but file operation failed:\n${message}`);
+        await ctx.editMessageText(`Approved, but operation failed:\n${message}`).catch(async () => {
+          await ctx.reply(`Approved, but operation failed:\n${message}`);
         });
       }
     });
@@ -163,20 +162,17 @@ export class TelegramConnector {
     return text.replace(new RegExp(`@${username}\\b`, 'g'), '').trim();
   }
 
-  private async requestFileApproval(ctx: Context, intent: DirectFileIntent): Promise<void> {
-    const id = randomUUID();
-    this.pendingFileApprovals.set(id, intent);
-    const operation = intent.kind === 'file-write' ? 'write' : 'delete';
+  private async requestOperationApproval(ctx: Context, operation: OperationIntent): Promise<void> {
+    const pending = this.operationApprovals.request(operation);
     const keyboard = new InlineKeyboard()
-      .text('Approve', `${intent.kind}:approve:${id}`)
-      .text('Deny', `${intent.kind}:deny:${id}`);
+      .text('Approve', `operation:approve:${pending.id}`)
+      .text('Deny', `operation:deny:${pending.id}`);
 
     await ctx.reply([
-      'Permission needed:',
-      intent.description,
-      intent.path,
+      renderOperationApproval(pending.operation),
       '',
-      `Approve this file ${operation}?`,
+      `Type: ${humanOperationKind(pending.operation.kind)}`,
+      `Risk: ${pending.operation.risk}`,
     ].join('\n'), { reply_markup: keyboard });
   }
 
@@ -300,25 +296,4 @@ export class TelegramConnector {
     console.log('[telegram] Stopping bot…');
     this.bot.stop();
   }
-}
-
-async function executeApprovedFileWrite(path: string, content: string): Promise<string> {
-  await mkdir(dirname(path), { recursive: true });
-  await writeFile(path, content, 'utf8');
-  return `Approved and created:\n${path}`;
-}
-
-async function executeApprovedFileDelete(path: string): Promise<string> {
-  const trashDir = join(homedir(), '.Trash');
-  await mkdir(trashDir, { recursive: true });
-  const destination = join(trashDir, uniqueTrashName(basename(path)));
-  await rename(path, destination);
-  return `Approved and moved to Trash:\n${path}\n→ ${destination}`;
-}
-
-function uniqueTrashName(fileName: string): string {
-  const dot = fileName.lastIndexOf('.');
-  const base = dot > 0 ? fileName.slice(0, dot) : fileName;
-  const ext = dot > 0 ? fileName.slice(dot) : '';
-  return `${base}-${new Date().toISOString().replace(/[:.]/g, '-')}-${randomUUID().slice(0, 8)}${ext}`;
 }

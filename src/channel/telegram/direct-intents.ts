@@ -1,30 +1,16 @@
 import { basename, join } from 'node:path';
 import { homedir } from 'node:os';
-
-export interface DirectFileWriteIntent {
-  kind: 'file-write';
-  path: string;
-  content: string;
-  description: string;
-}
-
-export interface DirectFileDeleteIntent {
-  kind: 'file-delete';
-  path: string;
-  description: string;
-}
-
-export type DirectFileIntent = DirectFileWriteIntent | DirectFileDeleteIntent;
+import type { OperationIntent } from '../../operations/approval.js';
 
 /**
  * Tiny deterministic bridge for early production testing while the full runtime
  * tool planner is being wired into normal Telegram operation.
  */
-export function parseDirectFileIntent(text: string): DirectFileIntent | undefined {
+export function parseDirectOperationIntent(text: string): OperationIntent | undefined {
   return parseDirectFileDeleteIntent(text) ?? parseDirectFileWriteIntent(text);
 }
 
-export function parseDirectFileWriteIntent(text: string): DirectFileWriteIntent | undefined {
+export function parseDirectFileWriteIntent(text: string): OperationIntent | undefined {
   const normalized = text.trim();
   const lower = normalized.toLowerCase();
   if (!/\b(create|write|make)\b/.test(lower)) return undefined;
@@ -40,14 +26,18 @@ export function parseDirectFileWriteIntent(text: string): DirectFileWriteIntent 
   const path = join(homedir(), 'Desktop', fileName);
 
   return {
-    kind: 'file-write',
-    path,
-    content: `# ${titleFromName(safeBaseName)}\n\nCreated by agent-core after Telegram approval.\n`,
+    kind: 'file.write',
+    target: path,
+    risk: 'medium',
+    args: {
+      path,
+      content: `# ${titleFromName(safeBaseName)}\n\nCreated by agent-core after Telegram approval.\n`,
+    },
     description: `Create ${fileName} on the Desktop`,
   };
 }
 
-export function parseDirectFileDeleteIntent(text: string): DirectFileDeleteIntent | undefined {
+export function parseDirectFileDeleteIntent(text: string): OperationIntent | undefined {
   const lower = text.trim().toLowerCase();
   if (!/\b(remove|delete|trash)\b/.test(lower)) return undefined;
 
@@ -61,8 +51,10 @@ export function parseDirectFileDeleteIntent(text: string): DirectFileDeleteInten
   const location = explicitDesktop ? 'from the Desktop' : 'from the Desktop';
 
   return {
-    kind: 'file-delete',
-    path,
+    kind: 'file.delete',
+    target: path,
+    risk: 'high',
+    args: { path, recoverable: true },
     description: `Move ${basename(path)} ${location} to Trash`,
   };
 }
