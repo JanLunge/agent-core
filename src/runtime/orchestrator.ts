@@ -6,6 +6,7 @@ import { selectWorkingMemory, type WorkingMemoryBundle } from '../conversation/w
 import type { Message } from '../llm/types.js';
 import type { Router, RoutingDecision } from '../router/router.js';
 import { storeRouteDecision } from '../router/route-history.js';
+import { decideNotification, type NotificationIntent, type NotificationTrigger } from '../notifications/policy.js';
 import { decideGuard, type GuardDecision, type GuardRequest } from '../tools/guard.js';
 
 export interface RuntimeResponderInput {
@@ -39,6 +40,7 @@ export interface RuntimeOutcome {
   guardDecisionRefs: BlockRef[];
   userMessageRef: BlockRef;
   assistantMessageRef: BlockRef;
+  notificationIntent: NotificationIntent;
   workingMemory: WorkingMemoryBundle;
   reply: string;
   route: RoutingDecision;
@@ -134,6 +136,19 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     { role: 'assistant', content: reply },
     [refFor(userMessage), refFor(routeBlock), refFor(modelBlock), ...guardBlocks.map(refFor)],
   );
+  const notificationIntent = decideNotification({
+    mode: input.event.modeHint,
+    trigger: notificationTriggerFor(input.event.modeHint, guardDecisions),
+    summary: reply,
+    refs: [
+      refFor(eventBlock),
+      refFor(routeBlock),
+      refFor(modelBlock),
+      refFor(userMessage),
+      refFor(assistantMessage),
+      ...guardBlocks.map(refFor),
+    ],
+  });
 
   return {
     eventRef: refFor(eventBlock),
@@ -142,12 +157,20 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     guardDecisionRefs: guardBlocks.map(refFor),
     userMessageRef: refFor(userMessage),
     assistantMessageRef: refFor(assistantMessage),
+    notificationIntent,
     workingMemory,
     reply,
     route,
     model,
     guardDecisions,
   };
+}
+
+function notificationTriggerFor(mode: NormalizedEvent['modeHint'], guardDecisions: GuardDecision[]): NotificationTrigger {
+  if (guardDecisions.some((guard) => guard.disposition === 'ask')) return 'approval-required';
+  if (mode === 'live') return 'live-response';
+  if (mode === 'background') return 'background-progress';
+  return 'async-progress';
 }
 
 function defaultResponder(input: RuntimeResponderInput): string {

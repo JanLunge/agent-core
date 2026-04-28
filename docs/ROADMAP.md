@@ -70,7 +70,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 30 LocalHeaperMemory runtime wiring.
 - [x] Add Slice 31 route/session store integration in orchestrator.
 - [x] Add Slice 32 approval request integration in tool boundary.
-- [ ] Add Slice 33 notification intents in runtime outcome.
+- [x] Add Slice 33 notification intents in runtime outcome.
 - [ ] Add Slice 34 blocker persistence on runtime failures.
 - [ ] Add Slice 35 persona config integration into router/model defaults.
 - [ ] Add Slice 36 background worker uses LocalHeaperMemory.
@@ -455,7 +455,7 @@ Validation:
 
 Status: implemented in `src/tools/boundary.ts`; ask decisions now create `approval-request` proposal refs with exact guard request/args and links to tool intent, guard decision, and origin refs, while deny/allow paths stay unchanged.
 
-### Slice 33 — Notification intents in runtime outcome
+### Slice 33 — Notification intents in runtime outcome ✅
 
 Goal: have runtime/orchestrator produce notification intents using the notification policy instead of leaving callers to infer chat vs background behavior.
 
@@ -464,6 +464,8 @@ Validation:
 - background ordinary progress stays silent;
 - blockers/approval requests request notification;
 - intents include reason and refs.
+
+Status: implemented in `src/runtime/orchestrator.ts`; runtime outcomes now include a `notificationIntent` from the central notification policy, with linked event/route/model/message/guard refs and approval-required escalation for ask decisions.
 
 ### Slice 34 — Blocker persistence on runtime failures
 

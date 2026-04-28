@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { AgentRuntime } from '../agent/agent.js';
-import { createChatEvent } from '../events/index.js';
+import { createBackgroundEvent, createChatEvent } from '../events/index.js';
 import { InMemoryHeaperMemory } from '../heaper/memory.js';
 import { createRouter } from '../router/router.js';
 import { runRuntimeEvent } from './orchestrator.js';
@@ -69,6 +69,17 @@ describe('runRuntimeEvent', () => {
     expect(outcome.modelDecisionRef).toEqual({ heap: 'agent/audit', id: 'block-4' });
     expect(outcome.userMessageRef).toEqual({ heap: 'agent/sessions', id: 'block-5' });
     expect(outcome.assistantMessageRef).toEqual({ heap: 'agent/sessions', id: 'block-6' });
+    expect(outcome.notificationIntent).toMatchObject({
+      action: 'direct-response',
+      reason: 'Live chat expects an immediate direct response.',
+      refs: [
+        outcome.eventRef,
+        outcome.routeRef,
+        outcome.modelDecisionRef,
+        outcome.userMessageRef,
+        outcome.assistantMessageRef,
+      ],
+    });
   });
 
   it('writes session messages and auditable decision blocks to the configured heaps', async () => {
@@ -170,6 +181,65 @@ describe('runRuntimeEvent', () => {
     expect(observedWorkingMemory).toContain('remember concise morning status');
     expect(observedWorkingMemory).toContain('noted');
     expect(observedWorkingMemory).toContain('what did I ask you to remember?');
+  });
+
+  it('keeps ordinary background progress silent in the runtime notification intent', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    const outcome = await runRuntimeEvent({
+      event: createBackgroundEvent({ taskId: 'task-1', persona: 'mira', content: 'continue queued work' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      modelPolicy,
+      availableModels,
+      responder: () => 'Processed one queued continuation step.',
+    });
+
+    expect(outcome.notificationIntent).toMatchObject({
+      action: 'silent',
+      priority: 'low',
+      reason: 'Ordinary background progress should not interrupt.',
+      message: 'Processed one queued continuation step.',
+      refs: [outcome.eventRef, outcome.routeRef, outcome.modelDecisionRef, outcome.userMessageRef, outcome.assistantMessageRef],
+    });
+  });
+
+  it('requests notification when background runtime guard decisions require approval', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    const outcome = await runRuntimeEvent({
+      event: createBackgroundEvent({ taskId: 'task-approval', persona: 'mira', content: 'write generated file' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      modelPolicy,
+      availableModels,
+      guardRequests: [{ surface: 'file', action: 'write', target: '/workspace/out.txt' }],
+      responder: () => 'Need approval before writing /workspace/out.txt.',
+    });
+
+    expect(outcome.guardDecisions.map((guard) => guard.disposition)).toEqual(['ask']);
+    expect(outcome.notificationIntent).toMatchObject({
+      action: 'notify',
+      priority: 'high',
+      reason: 'An explicit approval decision is required.',
+      message: 'Need approval before writing /workspace/out.txt.',
+      refs: [
+        outcome.eventRef,
+        outcome.routeRef,
+        outcome.modelDecisionRef,
+        outcome.userMessageRef,
+        outcome.assistantMessageRef,
+        outcome.guardDecisionRefs[0],
+      ],
+    });
   });
 
   it('records guard and sensitive local-model decisions as auditable refs', async () => {
