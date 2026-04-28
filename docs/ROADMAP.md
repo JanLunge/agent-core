@@ -64,6 +64,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 24 local durable HeaperMemory storage adapter.
 - [x] Add Slice 25 Heaper adapter contract tests.
 - [x] Add Slice 26 persona configuration loader.
+- [x] Add Slice 27 delegation/reference workflow.
 
 ## Active Slice Queue
 
@@ -371,7 +372,7 @@ Validation:
 
 Status: implemented in `src/heaper/persona-config.ts` with tests in `src/heaper/persona-config.test.ts`.
 
-### Slice 27 — Delegation/reference workflow
+### Slice 27 — Delegation/reference workflow ✅
 
 Goal: model agent-to-agent delegation through task blocks and shared refs rather than hidden copied context.
 
@@ -380,6 +381,8 @@ Validation:
 - delegated worker sees only permitted refs;
 - result links back to origin session/task;
 - private persona blocks are not silently copied.
+
+Status: implemented in `src/heaper/delegation.ts` with tests in `src/heaper/delegation.test.ts`.
 
 ### Slice 28 — End-to-end smoke scenario
 
