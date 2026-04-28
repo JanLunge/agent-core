@@ -78,7 +78,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 38 real-run audit export command.
 - [x] Add Slice 39 runtime audit export CLI fixture for Telegram spike stores.
 - [x] Add Slice 40 audit trail redaction policy tests for secret-like fields.
-- [ ] Add Slice 41 resumable approval application flow.
+- [x] Add Slice 41 resumable approval application flow.
 - [ ] Add Slice 42 task-to-runtime continuation bridge.
 - [ ] Add Slice 43 persona daily continuity startup injection.
 - [ ] Add Slice 44 route handoff scoring notes and scaffold.
@@ -559,7 +559,7 @@ Validation:
 
 Status: implemented in `src/cli/audit-export.ts`; audit export now recursively redacts sensitive keys and secret-looking string values before deterministic rendering, with coverage in `src/cli/audit-export.test.ts` for nested metadata, tool args, proposal operations, objects, and arrays.
 
-### Slice 41 — Resumable approval application flow
+### Slice 41 — Resumable approval application flow ✅
 
 Goal: connect approved approval-request blocks to a safe resume/apply path rather than only storing decisions.
 
@@ -567,6 +567,8 @@ Validation:
 - approved request can produce a resumable task/ref;
 - denied/cancelled requests do not resume;
 - applied state links approval, task/session, and result refs.
+
+Status: implemented in `src/tools/approval-requests.ts`; approved requests can now create `approval-resume` task blocks, transition to applied with resume refs, and link session/result refs while denied/cancelled requests remain non-resumable.
 
 ### Slice 42 — Task-to-runtime continuation bridge
 
