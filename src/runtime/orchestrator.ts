@@ -78,7 +78,12 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     sessionRef: refFor(sessionBlock),
   });
 
-  const history = [...(input.history ?? []), { role: 'user' as const, content: input.event.content, timestamp: input.event.receivedAt }];
+  const persistedHistory = await sessionStore.getRecentMessages(route.sessionId, 11);
+  const history = [
+    ...persistedHistory,
+    ...(input.history ?? []),
+    { role: 'user' as const, content: input.event.content, timestamp: input.event.receivedAt },
+  ];
   const workingMemory = await selectWorkingMemory({
     memory: input.memory,
     history,

@@ -134,6 +134,44 @@ describe('runRuntimeEvent', () => {
     expect(outcome.workingMemory.retrievedBlocks.map((block) => block.ref)).toContainEqual({ heap: 'agent/sessions', id: 'block-1' });
   });
 
+  it('hydrates working memory from prior persisted session messages', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    await runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-memory-1', channelType: 'telegram', chatId: 'jan', text: 'remember concise morning status' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      modelPolicy,
+      availableModels,
+      responder: () => 'noted',
+    });
+
+    let observedWorkingMemory = '';
+    const second = await runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-memory-2', channelType: 'telegram', chatId: 'jan', text: 'what did I ask you to remember?' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      modelPolicy,
+      availableModels,
+      responder: ({ workingMemory }) => {
+        observedWorkingMemory = workingMemory.text;
+        return 'checking memory';
+      },
+    });
+
+    expect(second.route).toMatchObject({ sessionId: 'mira-1', reason: 'existing-channel-binding' });
+    expect(second.workingMemory.stats.messageCount).toBe(3);
+    expect(observedWorkingMemory).toContain('remember concise morning status');
+    expect(observedWorkingMemory).toContain('noted');
+    expect(observedWorkingMemory).toContain('what did I ask you to remember?');
+  });
+
   it('records guard and sensitive local-model decisions as auditable refs', async () => {
     const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
     const router = createRouter();
