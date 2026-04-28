@@ -11,6 +11,8 @@
   },
   "scripts": {
     "dev": "tsx src/cli/index.ts",
+    "dev:telegram-spike": "tsx src/cli/index.ts runtime-telegram-spike --store ./data/runtime-telegram-spike-memory.json --allowed-user 177485465",
+    "start:telegram-spike": "tsx src/cli/index.ts runtime-telegram-spike --store ./data/runtime-telegram-spike-memory.json --allowed-user 177485465",
     "build": "pnpm run build:dashboard && tsup",
     "build:dashboard": "cd src/dashboard && npx vite build",
     "test": "vitest run",
