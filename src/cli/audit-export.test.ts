@@ -39,6 +39,76 @@ describe('audit export', () => {
     expect(text).not.toContain('supersecret');
   });
 
+  it('redacts secret-like fields across nested metadata tool and proposal blocks while preserving context', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'secret', now: () => '2026-04-28T15:02:00.000Z' });
+    const session = await memory.createBlock({ heap: 'agent/sessions', type: 'session', data: { sessionId: 'mira-secret' }, tags: ['session'] });
+    await memory.createBlock({
+      heap: 'agent/audit',
+      type: 'metadata',
+      tags: ['runtime-event'],
+      links: [{ heap: session.heap, id: session.id }],
+      data: {
+        event: {
+          id: 'evt-secret',
+          content: 'call API',
+          headers: {
+            Authorization: 'Bearer bearer-token-value',
+            'x-api-key': 'header-api-key-value',
+            Accept: 'application/json',
+          },
+          nested: [{ token: 'nested-token-value', safe: 'keep-me' }],
+        },
+      },
+    });
+    await memory.createBlock({
+      heap: 'agent/audit',
+      type: 'metadata',
+      tags: ['tool-intent'],
+      links: [{ heap: session.heap, id: session.id }],
+      data: {
+        tool: {
+          name: 'api.call',
+          args: {
+            api_key: 'tool-api-key-value',
+            payload: ['Bearer array-bearer-value', { password: 'array-password-value', label: 'visible-label' }],
+          },
+        },
+      },
+    });
+    await memory.createBlock({
+      heap: 'agent/approvals',
+      type: 'proposal',
+      tags: ['approval-request'],
+      links: [{ heap: session.heap, id: session.id }],
+      data: {
+        status: 'pending',
+        proposedOperation: {
+          target: 'https://example.test',
+          clientSecret: 'proposal-secret-value',
+          reason: 'visible approval context',
+        },
+      },
+    });
+
+    const text = await exportAuditTrail({ memory, startRef: { heap: session.heap, id: session.id }, maxDepth: 2 });
+
+    expect(text).toContain('"Accept":"application/json"');
+    expect(text).toContain('"safe":"keep-me"');
+    expect(text).toContain('"name":"api.call"');
+    expect(text).toContain('"label":"visible-label"');
+    expect(text).toContain('"reason":"visible approval context"');
+    expect(text).toContain('"Authorization":"[REDACTED]"');
+    expect(text).toContain('"x-api-key":"[REDACTED]"');
+    expect(text).toContain('"token":"[REDACTED]"');
+    expect(text).toContain('"api_key":"[REDACTED]"');
+    expect(text).toContain('"password":"[REDACTED]"');
+    expect(text).toContain('"clientSecret":"[REDACTED]"');
+    expect(text).toContain('Bearer [REDACTED]');
+    for (const secret of ['bearer-token-value', 'header-api-key-value', 'nested-token-value', 'tool-api-key-value', 'array-bearer-value', 'array-password-value', 'proposal-secret-value']) {
+      expect(text).not.toContain(secret);
+    }
+  });
+
   it('runs against LocalHeaperMemory stores and parses refs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-core-audit-export-'));
     const storePath = join(dir, 'memory.json');

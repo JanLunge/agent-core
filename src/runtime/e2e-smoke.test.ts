@@ -109,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 39 — Runtime audit export CLI fixture for Telegram spike stores');
-    expect(report.text).toContain('Active slice: Slice 40 — Audit trail redaction policy tests for secret-like fields');
+    expect(report.text).toContain('Completed slice: Slice 40 — Audit trail redaction policy tests for secret-like fields');
+    expect(report.text).toContain('Active slice: Slice 41 — Resumable approval application flow');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {

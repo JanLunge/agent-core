@@ -113,11 +113,23 @@ function labelFor(block: HeaperBlock): string {
 }
 
 function renderData(block: HeaperBlock): string {
-  const json = stableJson(block.data);
-  if (block.tags.includes('runtime-blocker') || JSON.stringify(block.data).match(/api[_-]?key|token|password|secret|bearer\s+/i)) {
-    return redactSensitiveDetails(json);
+  return stableJson(redactAuditData(block.data));
+}
+
+function redactAuditData(value: unknown): unknown {
+  if (typeof value === 'string') return redactSensitiveDetails(value);
+  if (Array.isArray(value)) return value.map(redactAuditData);
+  if (value && typeof value === 'object') {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([key, item]) => [
+      key,
+      isSensitiveKey(key) ? '[REDACTED]' : redactAuditData(item),
+    ]));
   }
-  return json;
+  return value;
+}
+
+function isSensitiveKey(key: string): boolean {
+  return /^(authorization|api[_-]?key|token|password|secret)$/i.test(key) || /(api[_-]?key|token|password|secret)$/i.test(key);
 }
 
 function stableJson(value: unknown): string {
