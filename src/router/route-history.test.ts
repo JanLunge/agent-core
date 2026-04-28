@@ -16,6 +16,7 @@ function decision(overrides: Partial<RoutingDecision> = {}): RoutingDecision {
     modelPolicyHint: 'default',
     respondLive: true,
     reason: 'default-agent',
+    candidateScores: [{ agentName: 'mira', score: 10, reasons: ['default-agent-match'] }],
     ...overrides,
   };
 }
@@ -48,6 +49,7 @@ describe('route history', () => {
         'mode:live',
         'sensitivity:normal',
         'reason:default-agent',
+        'candidate:mira:10',
       ],
       data: {
         eventId: 'evt-1',
@@ -57,6 +59,7 @@ describe('route history', () => {
         mode: 'live',
         sensitivity: 'normal',
         reason: 'default-agent',
+        candidateScores: [{ agentName: 'mira', score: 10, reasons: ['default-agent-match'] }],
         eventSource: 'chat',
         eventSurface: 'signal',
       },

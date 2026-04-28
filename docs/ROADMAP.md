@@ -81,7 +81,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 41 resumable approval application flow.
 - [x] Add Slice 42 task-to-runtime continuation bridge.
 - [x] Add Slice 43 persona daily continuity startup injection.
-- [ ] Add Slice 44 route handoff scoring notes and scaffold.
+- [x] Add Slice 44 route handoff scoring notes and scaffold.
 - [ ] Add Slice 45 durable notification outbox blocks.
 - [ ] Add Slice 46 local audit compaction/snapshot command.
 - [ ] Add Slice 47 runtime health/status command over local memory.
@@ -592,7 +592,7 @@ Validation:
 
 Status: implemented in `src/runtime/orchestrator.ts` and `src/conversation/working-memory.ts`; runtime reads yesterday/today daily continuity when a daily heap is configured, injects bounded continuity into working memory before responding, and carries linked session summaries as refs only.
 
-### Slice 44 — Route handoff scoring notes and scaffold
+### Slice 44 — Route handoff scoring notes and scaffold ✅
 
 Goal: replace sticky/default-only routing with an inspectable handoff scoring scaffold.
 
@@ -600,6 +600,8 @@ Validation:
 - scoring reasons are durable route metadata;
 - explicit persona still wins;
 - fallback remains deterministic when scores tie.
+
+Status: implemented in `src/router/router.ts` and `src/router/route-history.ts`; route decisions now carry candidate scores and reasons, explicit persona matches outrank sticky bindings/defaults, deterministic score/name ordering is covered by tests, and top candidates are stored as durable route metadata/tags.
 
 ### Slice 45 — Durable notification outbox blocks
 

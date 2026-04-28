@@ -13,6 +13,7 @@ export interface RouteRecordData extends Record<string, unknown> {
   modelPolicyHint: RoutingDecision['modelPolicyHint'];
   respondLive: boolean;
   reason: string;
+  candidateScores: RoutingDecision['candidateScores'];
   eventSource?: NormalizedEvent['source'];
   eventSurface?: string;
   eventTags?: string[];
@@ -49,6 +50,7 @@ export async function storeRouteDecision(input: StoreRouteDecisionInput): Promis
     modelPolicyHint: input.decision.modelPolicyHint,
     respondLive: input.decision.respondLive,
     reason: input.decision.reason,
+    candidateScores: input.decision.candidateScores,
     eventSource: input.event.source,
     eventSurface: input.event.surface,
     eventTags: input.event.routing.tags,
@@ -67,6 +69,7 @@ export async function storeRouteDecision(input: StoreRouteDecisionInput): Promis
       `mode:${input.decision.mode}`,
       `sensitivity:${input.decision.sensitivity}`,
       `reason:${input.decision.reason}`,
+      ...input.decision.candidateScores.slice(0, 3).map((candidate) => `candidate:${candidate.agentName}:${candidate.score}`),
       ...(input.decision.persona ? [`persona:${input.decision.persona}`] : []),
     ],
     links: [input.eventRef, input.sessionRef],

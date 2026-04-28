@@ -13,6 +13,12 @@ export interface IncomingMessage {
 
 export type ModelPolicyHint = 'default' | 'local-required';
 
+export interface RouteCandidateScore {
+  agentName: string;
+  score: number;
+  reasons: string[];
+}
+
 export interface RoutingDecision {
   eventId: string;
   agentName: string;
@@ -24,6 +30,7 @@ export interface RoutingDecision {
   modelPolicyHint: ModelPolicyHint;
   respondLive: boolean;
   reason: string;
+  candidateScores: RouteCandidateScore[];
 }
 
 export interface Router {
@@ -60,23 +67,58 @@ export function createRouter(): Router {
     return name.trim().toLowerCase();
   }
 
-  function resolveAgentName(event: NormalizedEvent): { agentName: string; reason: string } {
+  function scoreCandidates(event: NormalizedEvent): RouteCandidateScore[] {
     const explicitPersona = event.personaHint ? normalizeAgentName(event.personaHint) : undefined;
-    if (explicitPersona && agents.has(explicitPersona)) {
-      return { agentName: explicitPersona, reason: 'explicit-persona' };
+    const bindingKey = event.conversationKey ?? event.routing.channelId;
+    const boundAgent = bindingKey ? bindings.get(bindingKey) : undefined;
+
+    return Array.from(agents.keys()).sort().map((agentName) => {
+      const reasons: string[] = [];
+      let score = 0;
+      if (explicitPersona === agentName) {
+        score += 1000;
+        reasons.push('explicit-persona-match');
+      }
+      if (boundAgent === agentName) {
+        score += 100;
+        reasons.push('existing-channel-binding-match');
+      }
+      if (defaultAgentName === agentName) {
+        score += 10;
+        reasons.push('default-agent-match');
+      }
+      if (event.routing.taskType && agentName === normalizeAgentName(event.routing.taskType)) {
+        score += 25;
+        reasons.push('task-type-name-match');
+      }
+      if (reasons.length === 0) reasons.push('fallback-candidate');
+      return { agentName, score, reasons };
+    }).sort((a, b) => b.score - a.score || a.agentName.localeCompare(b.agentName));
+  }
+
+  function resolveAgentName(event: NormalizedEvent): { agentName: string; reason: string; candidateScores: RouteCandidateScore[] } {
+    const candidateScores = scoreCandidates(event);
+    const explicitPersona = event.personaHint ? normalizeAgentName(event.personaHint) : undefined;
+    if (explicitPersona) {
+      const explicit = candidateScores.find((candidate) => candidate.agentName === explicitPersona);
+      if (explicit) return { agentName: explicit.agentName, reason: 'explicit-persona', candidateScores };
     }
 
     const bindingKey = event.conversationKey ?? event.routing.channelId;
     const boundAgent = bindingKey ? bindings.get(bindingKey) : undefined;
-    if (boundAgent) return { agentName: boundAgent, reason: 'existing-channel-binding' };
+    if (boundAgent) return { agentName: boundAgent, reason: 'existing-channel-binding', candidateScores };
 
-    if (defaultAgentName) return { agentName: defaultAgentName, reason: 'default-agent' };
+    const topCandidate = candidateScores[0];
+    if (topCandidate) {
+      const reason = topCandidate.reasons.includes('default-agent-match') ? 'default-agent' : 'scored-fallback';
+      return { agentName: topCandidate.agentName, reason, candidateScores };
+    }
 
     throw new Error('No agent registered to handle this event');
   }
 
   function planForEvent(event: NormalizedEvent): RoutingDecision {
-    const { agentName, reason } = resolveAgentName(event);
+    const { agentName, reason, candidateScores } = resolveAgentName(event);
     const agent = agents.get(agentName);
     if (!agent) {
       throw new Error(`Agent "${agentName}" not found`);
@@ -101,6 +143,7 @@ export function createRouter(): Router {
       modelPolicyHint,
       respondLive: event.modeHint === 'live',
       reason,
+      candidateScores,
     };
   }
 
