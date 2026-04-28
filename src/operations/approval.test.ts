@@ -8,15 +8,15 @@ describe('OperationApprovalBroker', () => {
   it('stores and consumes any typed pending operation by id', () => {
     const broker = new OperationApprovalBroker();
     const pending = broker.request({
-      kind: 'file.write',
-      description: 'Write a note',
-      target: '/tmp/note.md',
+      kind: 'tool.call',
+      description: 'Run tool write_file',
+      target: 'write_file',
       risk: 'medium',
-      args: { path: '/tmp/note.md', content: 'hello' },
+      args: { toolName: 'write_file', toolArgs: { path: '/tmp/note.md', content: 'hello' } },
     });
 
-    expect(renderOperationApproval(pending.operation)).toContain('Approve this file write?');
-    expect(broker.take(pending.id)).toMatchObject({ kind: 'file.write', target: '/tmp/note.md' });
+    expect(renderOperationApproval(pending.operation)).toContain('Approve this tool call?');
+    expect(broker.take(pending.id)).toMatchObject({ kind: 'tool.call', target: 'write_file' });
     expect(broker.take(pending.id)).toBeUndefined();
   });
 

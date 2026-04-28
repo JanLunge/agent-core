@@ -1,7 +1,7 @@
 import { Bot, InlineKeyboard, type Context } from 'grammy';
 import type { Router, IncomingMessage } from '../../router/router.js';
 import type { StreamChunk } from '../../llm/types.js';
-import type { ApprovalResult } from '../../tools/approval.js';
+import type { ApprovalRequest, ApprovalResult } from '../../tools/approval.js';
 import { escapeMarkdownV2, splitMessage } from './format.js';
 import { parseDirectOperationIntent } from './direct-intents.js';
 import {
@@ -27,6 +27,7 @@ export class TelegramConnector {
   private allowedUsers: Set<number> | undefined;
   private allowedGroups: Set<number> | undefined;
   private operationApprovals = new OperationApprovalBroker();
+  private pendingToolApprovalResolvers = new Map<string, (result: ApprovalResult) => void>();
 
   constructor(options: TelegramConnectorOptions) {
     this.bot = new Bot(options.token);
@@ -135,13 +136,23 @@ export class TelegramConnector {
         return;
       }
 
+      const resolveToolApproval = this.pendingToolApprovalResolvers.get(id);
+      this.pendingToolApprovalResolvers.delete(id);
+
       if (action === 'deny') {
+        resolveToolApproval?.({ action: 'deny', reason: 'User denied this operation.' });
         await ctx.answerCallbackQuery({ text: 'Denied.' }).catch(() => {});
         await ctx.editMessageText(`Denied: ${operation.description}\n${operation.target}`).catch(() => {});
         return;
       }
 
       await ctx.answerCallbackQuery({ text: 'Approved.' }).catch(() => {});
+      if (resolveToolApproval) {
+        resolveToolApproval({ action: 'approve' });
+        await ctx.editMessageText(`Approved:\n${operation.description}\n${operation.target}`).catch(() => {});
+        return;
+      }
+
       try {
         const result = await executeApprovedOperation(operation);
         await ctx.editMessageText(result.message).catch(async () => {
@@ -174,6 +185,38 @@ export class TelegramConnector {
       `Type: ${humanOperationKind(pending.operation.kind)}`,
       `Risk: ${pending.operation.risk}`,
     ].join('\n'), { reply_markup: keyboard });
+  }
+
+  private async requestToolCallApproval(ctx: Context, request: ApprovalRequest): Promise<ApprovalResult> {
+    const pending = this.operationApprovals.request({
+      kind: 'tool.call',
+      target: request.toolName,
+      risk: 'medium',
+      args: { toolName: request.toolName, toolArgs: request.args },
+      description: `Run tool ${request.toolName}`,
+    });
+    const keyboard = new InlineKeyboard()
+      .text('Approve', `operation:approve:${pending.id}`)
+      .text('Deny', `operation:deny:${pending.id}`);
+
+    const approvalPromise = new Promise<ApprovalResult>((resolve) => {
+      this.pendingToolApprovalResolvers.set(pending.id, resolve);
+    });
+
+    await ctx.reply([
+      renderOperationApproval(pending.operation),
+      '',
+      `Type: ${humanOperationKind(pending.operation.kind)}`,
+      `Risk: ${pending.operation.risk}`,
+      '',
+      'Arguments:',
+      formatApprovalArgs(request.args),
+    ].join('\n'), { reply_markup: keyboard });
+
+    return withApprovalTimeout(approvalPromise, 10 * 60 * 1000, () => {
+      this.operationApprovals.take(pending.id);
+      this.pendingToolApprovalResolvers.delete(pending.id);
+    });
   }
 
   // ---------------------------------------------------------------------------
@@ -227,9 +270,7 @@ export class TelegramConnector {
     typingTimer = setInterval(() => { void sendTyping(); }, 4_000);
     editTimer = setInterval(flushEdit, 500);
 
-    // TODO: Telegram approval flow with inline keyboards comes in Phase 3.
-    // For now, auto-approve all tool calls from Telegram.
-    const onApproval = async () => ({ action: 'approve' }) as ApprovalResult;
+    const onApproval = (request: ApprovalRequest): Promise<ApprovalResult> => this.requestToolCallApproval(ctx, request);
 
     try {
       const result = await this.router.route(message, onStream, onApproval);
@@ -295,5 +336,31 @@ export class TelegramConnector {
   stop(): void {
     console.log('[telegram] Stopping bot…');
     this.bot.stop();
+  }
+}
+
+function formatApprovalArgs(args: Record<string, unknown>): string {
+  const json = JSON.stringify(args, null, 2) ?? '{}';
+  return json.length > 1_500 ? `${json.slice(0, 1_500)}\n…[truncated]` : json;
+}
+
+async function withApprovalTimeout(
+  promise: Promise<ApprovalResult>,
+  timeoutMs: number,
+  onTimeout: () => void,
+): Promise<ApprovalResult> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<ApprovalResult>((resolve) => {
+        timer = setTimeout(() => {
+          onTimeout();
+          resolve({ action: 'deny', reason: 'Approval request timed out.' });
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timer) clearTimeout(timer);
   }
 }

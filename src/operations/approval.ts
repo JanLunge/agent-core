@@ -3,7 +3,7 @@ import { mkdir, rename, writeFile } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
 import { homedir } from 'node:os';
 
-export type OperationKind = 'file.write' | 'file.delete';
+export type OperationKind = 'file.write' | 'file.delete' | 'tool.call';
 
 export interface OperationIntentBase {
   id?: string;
@@ -24,7 +24,12 @@ export interface FileDeleteOperation extends OperationIntentBase {
   args: { path: string; recoverable: true };
 }
 
-export type OperationIntent = FileWriteOperation | FileDeleteOperation;
+export interface ToolCallOperation extends OperationIntentBase {
+  kind: 'tool.call';
+  args: { toolName: string; toolArgs: Record<string, unknown> };
+}
+
+export type OperationIntent = FileWriteOperation | FileDeleteOperation | ToolCallOperation;
 
 export interface OperationExecutionResult {
   ok: boolean;
@@ -59,6 +64,8 @@ export async function executeApprovedOperation(operation: OperationIntent): Prom
       return executeFileWrite(operation.args.path, operation.args.content);
     case 'file.delete':
       return executeFileDelete(operation.args.path);
+    case 'tool.call':
+      throw new Error('Tool call operations are resumed by the tool executor after approval.');
   }
 }
 
@@ -75,6 +82,7 @@ export function renderOperationApproval(operation: OperationIntent): string {
 export function humanOperationKind(kind: OperationKind): string {
   if (kind === 'file.write') return 'file write';
   if (kind === 'file.delete') return 'file delete';
+  if (kind === 'tool.call') return 'tool call';
   return kind;
 }
 
