@@ -73,13 +73,12 @@ export function createRuntimeTelegramSpikeRuntime(options: Omit<RuntimeTelegramS
         modelPolicy,
         availableModels,
         guardRequests: guardRequestsFor(input.text),
-        responder: ({ route, workingMemory, model, guardDecisions }) => [
-          `Spike responder for ${route.agentName}.`,
-          `route=${route.reason} session=${route.sessionId} mode=${route.mode} sensitivity=${route.sensitivity}`,
-          `model=${model.model}`,
-          `workingMemoryMessages=${workingMemory.stats.messageCount} retrieved=${workingMemory.stats.retrievedCount}`,
-          guardDecisions.length > 0 ? `runtimeGuards=${guardDecisions.map((guard) => `${guard.disposition}:${guard.reason}`).join(' | ')}` : 'runtimeGuards=none',
-        ].join('\n'),
+        responder: ({ event, route, workingMemory, guardDecisions }) => renderConversationalAnswer({
+          text: event.content,
+          agentName: route.agentName,
+          workingMemoryText: workingMemory.text,
+          guardDecisions,
+        }),
       });
 
       const boundaryExecutions = await runRequestedBoundaryTools({
@@ -223,23 +222,87 @@ async function runRequestedBoundaryTools(input: {
   return executions;
 }
 
+function renderConversationalAnswer(input: {
+  text: string;
+  agentName: string;
+  workingMemoryText: string;
+  guardDecisions: Array<{ disposition: string; reason: string }>;
+}): string {
+  const lower = input.text.toLowerCase();
+
+  if (lower.includes('what did i ask') && lower.includes('remember')) {
+    const remembered = extractRememberedText(input.workingMemoryText);
+    return remembered
+      ? `You asked me to remember: ${remembered}.`
+      : "I can see the session history, but I couldn't extract a remembered item from it.";
+  }
+
+  if (lower.includes('remember')) {
+    const remembered = extractRememberCommand(input.text);
+    return remembered
+      ? `Got it — I'll remember: ${remembered}.`
+      : "Got it — I recorded this turn in the durable runtime session memory.";
+  }
+
+  if (input.guardDecisions.some((guard) => guard.disposition === 'deny')) {
+    return `I handled that in ${input.agentName}. I blocked the unsafe part: ${input.guardDecisions.map((guard) => guard.reason).join('; ')}`;
+  }
+
+  if (input.agentName === 'ops') {
+    return 'Ops is handling this handoff. The sticky routing path is active.';
+  }
+
+  return `Handled by ${input.agentName}. The runtime path is active and this turn was stored.`;
+}
+
+function extractRememberedText(workingMemoryText: string): string | undefined {
+  const candidates = Array.from(workingMemoryText.matchAll(/(?:^|\n)- user[^:]*:\s*(.*remember[:\s-]+)(.*)/gi));
+  const latest = candidates.at(-1)?.[2]?.trim();
+  return latest ? cleanRememberedText(latest) : undefined;
+}
+
+function extractRememberCommand(text: string): string | undefined {
+  const match = text.match(/remember[:\s-]+(.+)/i)?.[1]?.trim();
+  return match ? cleanRememberedText(match) : undefined;
+}
+
+function cleanRememberedText(text: string): string {
+  return text
+    .replace(/\s+and\s+run\s+status\s+tool\b.*$/i, '')
+    .replace(/\s+and\s+use\s+status\s+tool\b.*$/i, '')
+    .replace(/[.\s]+$/g, '')
+    .trim();
+}
+
 function renderSpikeReply(input: { outcome: RuntimeOutcome; boundaryExecutions: BoundaryToolExecution[]; storePath: string }): string {
   const { outcome } = input;
-  const lines = [
-    'Agent-core runtime spike ✅',
-    `agent: ${outcome.route.agentName}`,
-    `route: ${outcome.route.reason}`,
-    `session: ${outcome.route.sessionId}`,
-    `mode: ${outcome.route.mode}`,
-    `sensitivity: ${outcome.route.sensitivity}`,
-    `model: ${outcome.model.model}`,
-    `working memory: ${outcome.workingMemory.stats.messageCount} recent messages, ${outcome.workingMemory.stats.retrievedCount} retrieved blocks`,
-    `runtime guards: ${outcome.guardDecisions.length ? outcome.guardDecisions.map((guard) => `${guard.disposition} (${guard.reason})`).join('; ') : 'none'}`,
-    `boundary tools: ${input.boundaryExecutions.length ? input.boundaryExecutions.map((tool) => `${tool.result.name}=${tool.guardDecision.disposition}${tool.approvalRequestRef ? ` approval=${formatRef(tool.approvalRequestRef)}` : ''}${tool.resultRef ? ` output=${formatRef(tool.resultRef)}` : ''}`).join('; ') : 'none'}`,
-    `refs: event=${formatRef(outcome.eventRef)} route=${formatRef(outcome.routeRef)} assistant=${formatRef(outcome.assistantMessageRef)}`,
-    `store: ${input.storePath}`,
+  const diagnostics = [
+    `agent=${outcome.route.agentName}`,
+    `route=${outcome.route.reason}`,
+    `session=${outcome.route.sessionId}`,
+    `mode=${outcome.route.mode}`,
+    `sensitivity=${outcome.route.sensitivity}`,
+    `model=${outcome.model.model}`,
+    `memory=${outcome.workingMemory.stats.messageCount}/${outcome.workingMemory.stats.retrievedCount}`,
+    `guards=${outcome.guardDecisions.length ? outcome.guardDecisions.map((guard) => guard.disposition).join(',') : 'none'}`,
+    `tools=${input.boundaryExecutions.length ? input.boundaryExecutions.map((tool) => `${tool.result.name}:${tool.guardDecision.disposition}`).join(',') : 'none'}`,
+    `refs=${formatRef(outcome.eventRef)} ${formatRef(outcome.routeRef)} ${formatRef(outcome.assistantMessageRef)}`,
   ];
-  return lines.join('\n');
+
+  const toolLines = input.boundaryExecutions.map((tool) => {
+    const refs = [
+      tool.approvalRequestRef ? `approval=${formatRef(tool.approvalRequestRef)}` : undefined,
+      tool.resultRef ? `output=${formatRef(tool.resultRef)}` : undefined,
+    ].filter(Boolean).join(' ');
+    return `- ${tool.result.name}: ${tool.guardDecision.disposition}${refs ? ` (${refs})` : ''}`;
+  });
+
+  return [
+    outcome.reply,
+    toolLines.length ? `\nTool checks:\n${toolLines.join('\n')}` : undefined,
+    `\nDiagnostics: ${diagnostics.join(' | ')}`,
+    `Store: ${input.storePath}`,
+  ].filter(Boolean).join('\n');
 }
 
 function formatRef(ref: BlockRef): string {

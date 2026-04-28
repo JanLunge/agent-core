@@ -16,9 +16,10 @@ describe('runtime telegram spike', () => {
       sender: 'Jan',
       messageId: '1',
     });
-    expect(first.text).toContain('agent: mira');
-    expect(first.text).toContain('route: default-agent');
-    expect(first.text).toContain('spike.status=allow');
+    expect(first.text).toContain("Got it — I'll remember: concise morning status");
+    expect(first.text).toContain('agent=mira');
+    expect(first.text).toContain('route=default-agent');
+    expect(first.text).toContain('spike.status: allow');
     expect(first.text).toContain('output=agent/tool-output#');
 
     const second = await runtime.handleTurn({
@@ -27,7 +28,8 @@ describe('runtime telegram spike', () => {
       sender: 'Jan',
       messageId: '2',
     });
-    expect(second.text).toContain('route: existing-channel-binding');
+    expect(second.text).toContain('You asked me to remember: concise morning status.');
+    expect(second.text).toContain('route=existing-channel-binding');
     expect(second.outcome.workingMemory.stats.messageCount).toBe(3);
     expect(second.outcome.workingMemory.text).toContain('remember concise morning status');
 
@@ -37,8 +39,9 @@ describe('runtime telegram spike', () => {
       sender: 'Jan',
       messageId: '3',
     });
-    expect(ops.text).toContain('agent: ops');
-    expect(ops.text).toContain('route: explicit-persona');
+    expect(ops.text).toContain('Ops is handling this handoff.');
+    expect(ops.text).toContain('agent=ops');
+    expect(ops.text).toContain('route=explicit-persona');
 
     const sensitive = await runtime.handleTurn({
       chatId: '177485465',
@@ -46,12 +49,12 @@ describe('runtime telegram spike', () => {
       sender: 'Jan',
       messageId: '4',
     });
-    expect(sensitive.text).toContain('agent: ops');
-    expect(sensitive.text).toContain('sensitivity: sensitive');
-    expect(sensitive.text).toContain('model: local/small');
-    expect(sensitive.text).toContain('deny (Sensitive mode blocks external/network operations.)');
-    expect(sensitive.text).toContain('spike.write-note=ask approval=agent/audit#');
-    expect(sensitive.text).toContain('spike.read-secret=deny');
+    expect(sensitive.text).toContain('I handled that in ops. I blocked the unsafe part: Sensitive mode blocks external/network operations.');
+    expect(sensitive.text).toContain('agent=ops');
+    expect(sensitive.text).toContain('sensitivity=sensitive');
+    expect(sensitive.text).toContain('model=local/small');
+    expect(sensitive.text).toContain('spike.write-note: ask (approval=agent/audit#');
+    expect(sensitive.text).toContain('spike.read-secret: deny');
 
     const persisted = JSON.parse(await readFile(storePath, 'utf8')) as { blocks: Array<{ tags?: string[]; type: string }> };
     expect(persisted.blocks.some((block) => block.tags?.includes('route-record'))).toBe(true);
