@@ -75,7 +75,17 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 35 persona config integration into router/model defaults.
 - [x] Add Slice 36 background worker uses LocalHeaperMemory.
 - [x] Add Slice 37 daily continuity writes from completed runtime turns.
-- [ ] Add Slice 38 real-run audit export command.
+- [x] Add Slice 38 real-run audit export command.
+- [ ] Add Slice 39 runtime audit export CLI fixture for Telegram spike stores.
+- [ ] Add Slice 40 audit trail redaction policy tests for secret-like fields.
+- [ ] Add Slice 41 resumable approval application flow.
+- [ ] Add Slice 42 task-to-runtime continuation bridge.
+- [ ] Add Slice 43 persona daily continuity startup injection.
+- [ ] Add Slice 44 route handoff scoring notes and scaffold.
+- [ ] Add Slice 45 durable notification outbox blocks.
+- [ ] Add Slice 46 local audit compaction/snapshot command.
+- [ ] Add Slice 47 runtime health/status command over local memory.
+- [ ] Add Slice 48 Heaper adapter migration checklist and contract gaps.
 
 ## Active Slice Queue
 
@@ -515,7 +525,7 @@ Validation:
 
 Status: implemented in `src/conversation/daily-continuity.ts` and `src/runtime/orchestrator.ts`; completed live/async runtime turns can append bounded continuity entries, link event/route/model/message/guard/blocker refs, reuse the same daily entry across turns, and omit sensitive reply content.
 
-### Slice 38 — Real-run audit export command
+### Slice 38 — Real-run audit export command ✅
 
 Goal: add a local inspection command that exports a readable audit trail for a session/task from linked Heaper blocks.
 
@@ -524,6 +534,98 @@ Validation:
 - includes event, route, model, guard, approval, tool, blocker, and result refs when linked;
 - redacts sensitive blocker/credential details;
 - output is deterministic for tests.
+
+Status: implemented in `src/cli/audit-export.ts`; `agent-core audit-export <heap#id> --store <path>` traverses linked and reverse-linked Heaper blocks, labels runtime audit artifacts, and redacts secret-like blocker data.
+
+### Slice 39 — Runtime audit export CLI fixture for Telegram spike stores
+
+Goal: add a documented fixture/script that runs the audit exporter against a deterministic Telegram-spike-like LocalHeaperMemory store.
+
+Validation:
+- fixture creates representative Telegram runtime blocks;
+- command output includes session, event, route, model, guard, approval, tool, blocker, daily refs;
+- docs show exact command and expected inspection pattern.
+
+### Slice 40 — Audit trail redaction policy tests for secret-like fields
+
+Goal: harden audit export redaction beyond blockers so credential-looking data never appears in readable exports.
+
+Validation:
+- redacts token/api_key/password/Authorization fields in metadata/tool/proposal blocks;
+- preserves non-sensitive operational context;
+- deterministic tests cover nested values and arrays.
+
+### Slice 41 — Resumable approval application flow
+
+Goal: connect approved approval-request blocks to a safe resume/apply path rather than only storing decisions.
+
+Validation:
+- approved request can produce a resumable task/ref;
+- denied/cancelled requests do not resume;
+- applied state links approval, task/session, and result refs.
+
+### Slice 42 — Task-to-runtime continuation bridge
+
+Goal: let background tasks invoke the runtime orchestrator with task/session refs instead of custom handlers only.
+
+Validation:
+- task content becomes a background normalized event;
+- runtime outcome result refs link back to task;
+- blocked runtime errors persist task blocker refs.
+
+### Slice 43 — Persona daily continuity startup injection
+
+Goal: feed daily continuity context into runtime working memory for personas at startup/first turn.
+
+Validation:
+- reads yesterday/today persona daily heap;
+- includes bounded continuity text in working memory;
+- linked summaries remain refs, not copied hidden state.
+
+### Slice 44 — Route handoff scoring notes and scaffold
+
+Goal: replace sticky/default-only routing with an inspectable handoff scoring scaffold.
+
+Validation:
+- scoring reasons are durable route metadata;
+- explicit persona still wins;
+- fallback remains deterministic when scores tie.
+
+### Slice 45 — Durable notification outbox blocks
+
+Goal: persist notification intents before delivery so interruptions are auditable and retryable.
+
+Validation:
+- runtime/worker intents can be stored as outbox blocks;
+- delivery state transitions are explicit;
+- silent intents are optionally summarized but not delivered.
+
+### Slice 46 — Local audit compaction/snapshot command
+
+Goal: produce bounded snapshots from verbose audit trails without deleting underlying blocks.
+
+Validation:
+- snapshot block links source refs;
+- raw blocks remain untouched;
+- export can include snapshot plus refs.
+
+### Slice 47 — Runtime health/status command over local memory
+
+Goal: add a local command summarizing active sessions, tasks, blockers, approvals, and recent daily continuity.
+
+Validation:
+- reads only configured local memory store;
+- counts active/pending/blocked artifacts;
+- includes refs for drill-down via audit export.
+
+### Slice 48 — Heaper adapter migration checklist and contract gaps
+
+Goal: document remaining differences between local memory scaffold and future Heaper tools before deeper integration.
+
+Validation:
+- maps each memory method to intended Heaper operation;
+- lists known gaps/assumptions;
+- identifies any feedback checkpoint for Jan.
 
 ## Reporting Template
 

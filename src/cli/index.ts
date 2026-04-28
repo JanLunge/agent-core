@@ -29,6 +29,7 @@ import { SecretResolver } from '../secrets/resolver.js';
 import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
 import { runRuntimeSmoke } from './runtime-smoke.js';
 import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
+import { runAuditExport } from './audit-export.js';
 
 const program = new Command();
 
@@ -275,6 +276,22 @@ program
       console.log(result.lines.join('\n'));
     } catch (err) {
       console.error('Runtime smoke failed:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('audit-export <ref>')
+  .description('Export a readable linked audit trail from a LocalHeaperMemory store block ref')
+  .requiredOption('-s, --store <path>', 'Local HeaperMemory JSON store path')
+  .option('-d, --depth <n>', 'Maximum link traversal depth', '5')
+  .action(async (ref: string, opts: { store: string; depth: string }) => {
+    try {
+      const maxDepth = Number.parseInt(opts.depth, 10);
+      if (!Number.isFinite(maxDepth) || maxDepth < 0) throw new Error(`Invalid depth: ${opts.depth}`);
+      console.log(await runAuditExport({ storePath: resolve(opts.store), ref, maxDepth }));
+    } catch (err) {
+      console.error('Audit export failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
   });
