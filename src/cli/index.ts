@@ -28,6 +28,7 @@ import { AuditLog } from '../secrets/audit.js';
 import { SecretResolver } from '../secrets/resolver.js';
 import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
 import { runRuntimeSmoke } from './runtime-smoke.js';
+import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
 
 const program = new Command();
 
@@ -276,6 +277,32 @@ program
       console.error('Runtime smoke failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
+  });
+
+program
+  .command('runtime-telegram-spike')
+  .description('Run a Telegram bot that exercises the new runtime path with durable memory, routing, guards, approvals, and audit refs')
+  .requiredOption('-s, --store <path>', 'Local HeaperMemory JSON store path')
+  .option('-t, --token <token>', 'Telegram bot token; defaults to TELEGRAM_BOT_TOKEN env var')
+  .option('-u, --allowed-user <id...>', 'Allowed Telegram user id(s)')
+  .action(async (opts: { store: string; token?: string; allowedUser?: string[] }) => {
+    const token = opts.token ?? process.env.TELEGRAM_BOT_TOKEN;
+    if (!token) {
+      console.error('Runtime Telegram spike needs --token or TELEGRAM_BOT_TOKEN.');
+      process.exit(1);
+    }
+    const allowedUsers = opts.allowedUser?.map((id) => Number(id)).filter(Number.isFinite);
+    const { stop } = await startRuntimeTelegramSpike({
+      token,
+      storePath: resolve(opts.store),
+      allowedUsers: allowedUsers && allowedUsers.length > 0 ? allowedUsers : undefined,
+    });
+    const shutdown = () => {
+      stop();
+      process.exit(0);
+    };
+    process.on('SIGINT', shutdown);
+    process.on('SIGTERM', shutdown);
   });
 
 const secrets = program.command('secrets').description('Manage encrypted secrets vault');
