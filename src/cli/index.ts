@@ -32,6 +32,7 @@ import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
 import { runAuditExport, runAuditSnapshot } from './audit-export.js';
 import { renderTelegramAuditFixture, runTelegramAuditFixture } from './audit-export-fixture.js';
 import { renderRuntimeStatusJson, runRuntimeStatus } from './runtime-status.js';
+import { runTaskResume } from './task-resume.js';
 
 const program = new Command();
 
@@ -296,6 +297,28 @@ program
       process.stdout.write(opts.json ? renderRuntimeStatusJson(status) : `${status.lines.join('\n')}\n`);
     } catch (err) {
       console.error('Runtime status failed:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('task-resume')
+  .description('Inspect pending approval-resume tasks and optionally mark them ready for continuation without executing approved operations')
+  .requiredOption('-s, --store <path>', 'Local HeaperMemory JSON store path')
+  .option('--task-heap <heap...>', 'Task heap(s) to scan')
+  .option('--approval-heap <heap...>', 'Approval heap(s) to scan when resolving operations')
+  .option('--mark-ready', 'Mark listed pending approval-resume tasks ready for continuation')
+  .action(async (opts: { store: string; taskHeap?: string[]; approvalHeap?: string[]; markReady?: boolean }) => {
+    try {
+      const summary = await runTaskResume({
+        storePath: resolve(opts.store),
+        taskHeaps: opts.taskHeap as (`human/${string}` | `agent/${string}` | `persona/${string}/${string}`)[] | undefined,
+        approvalHeaps: opts.approvalHeap as (`human/${string}` | `agent/${string}` | `persona/${string}/${string}`)[] | undefined,
+        markReady: Boolean(opts.markReady),
+      });
+      console.log(summary.lines.join('\n'));
+    } catch (err) {
+      console.error('Task resume inspection failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
   });

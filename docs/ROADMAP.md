@@ -90,7 +90,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 50 notification outbox integration in runtime and continuation worker.
 - [x] Add Slice 51 audit export support for notification outbox refs.
 - [x] Add Slice 52 runtime-status JSON output mode.
-- [ ] Add Slice 53 task resume command for approval-resume tasks.
+- [x] Add Slice 53 task resume command for approval-resume tasks.
 - [ ] Add Slice 54 typed link relation design note.
 - [ ] Add Slice 55 semantic time-range translation helper.
 - [ ] Add Slice 56 pagination-safe memory scan wrapper.
@@ -701,7 +701,7 @@ Validation:
 
 Status: implemented with `agent-core runtime-status --store <path> --json`, which emits the full `RuntimeStatusSummary` shape for scripts/cron while preserving the existing text output path by default.
 
-### Slice 53 — Task resume command for approval-resume tasks
+### Slice 53 — Task resume command for approval-resume tasks ✅
 
 Goal: add a local command to inspect and mark approval-resume tasks ready for continuation.
 
@@ -709,6 +709,8 @@ Validation:
 - lists pending `approval-resume` tasks;
 - shows approval/task refs and exact operation summary;
 - does not execute unsafe work without explicit approval path.
+
+Status: implemented with `agent-core task-resume --store <path> [--mark-ready]`. The command lists pending approval-resume tasks, resolves their approval refs and exact proposed operations, and can mark tasks ready for continuation by tagging/updating the task without executing the approved operation.
 
 ### Slice 54 — Typed link relation design note
 
