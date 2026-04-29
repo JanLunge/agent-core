@@ -12,9 +12,18 @@ export interface OpenAICodexProviderOptions {
   fetch?: FetchLike;
 }
 
+function toResponsesInstructions(messages: Message[]): string {
+  return messages
+    .filter((message) => message.role === 'system')
+    .map((message) => message.content.trim())
+    .filter(Boolean)
+    .join('\n\n');
+}
+
 function toResponsesInput(messages: Message[]): unknown[] {
   const input: unknown[] = [];
   for (const message of messages) {
+    if (message.role === 'system') continue;
     if (message.role === 'tool') {
       input.push({
         type: 'function_call_output',
@@ -35,7 +44,7 @@ function toResponsesInput(messages: Message[]): unknown[] {
       if (!message.content) continue;
     }
     input.push({
-      role: message.role === 'system' ? 'developer' : message.role,
+      role: message.role,
       content: message.content,
     });
   }
@@ -55,6 +64,7 @@ function toResponsesTools(tools: ToolDefinition[] | undefined): unknown[] | unde
 function buildResponsesPayload(req: LLMRequest, stream = false): Record<string, unknown> {
   return {
     model: req.model,
+    instructions: toResponsesInstructions(req.messages) || 'You are an assistant running inside agent-core. Answer clearly and use provided tools by returning function calls when needed; agent-core will execute tools after policy checks and approvals.',
     input: toResponsesInput(req.messages),
     tools: toResponsesTools(req.tools),
     temperature: req.temperature,

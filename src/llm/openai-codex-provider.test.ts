@@ -39,9 +39,34 @@ describe('openai-codex provider', () => {
     const body = JSON.parse(init.body as string);
     expect(body).toMatchObject({
       model: 'gpt-5.5',
+      instructions: expect.any(String),
       input: [{ role: 'user', content: 'ping' }],
       stream: false,
     });
+  });
+
+  it('sends system messages as required Responses instructions', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ model: 'gpt-5.5', output_text: 'ok' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    }));
+    const provider = createOpenAICodexProvider('codex-subscription', {
+      accessToken: 'test-token',
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await provider.complete({
+      model: 'gpt-5.5',
+      messages: [
+        { role: 'system', content: 'Be concise.' },
+        { role: 'user', content: 'ping' },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.instructions).toBe('Be concise.');
+    expect(body.input).toEqual([{ role: 'user', content: 'ping' }]);
   });
 
   it('returns function calls from the Responses output for the agent-core harness', async () => {
