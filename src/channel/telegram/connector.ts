@@ -125,7 +125,15 @@ export class TelegramConnector {
           sender: ctx.from?.username ?? ctx.from?.first_name,
         };
 
-        await this.handleMessage(ctx, incoming);
+        // Do not await the long-running route here. Tool approvals suspend
+        // inside router.route(), and grammY's long-polling update loop processes
+        // updates sequentially by default. If this handler awaits the suspended
+        // route, the callback_query update from the Approve/Deny button cannot
+        // be processed, so the button appears to do nothing.
+        void this.handleMessage(ctx, incoming).catch(async (err) => {
+          console.error('[telegram] Error handling message:', err);
+          await ctx.reply('Sorry, something went wrong.').catch(() => {});
+        });
       } catch (err) {
         console.error('[telegram] Error handling message:', err);
         await ctx.reply('Sorry, something went wrong.').catch(() => {});
