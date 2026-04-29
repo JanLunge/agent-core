@@ -42,6 +42,7 @@ describe('openai-codex provider', () => {
       instructions: expect.any(String),
       input: [{ role: 'user', content: 'ping' }],
       stream: false,
+      store: false,
     });
   });
 

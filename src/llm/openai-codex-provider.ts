@@ -70,6 +70,7 @@ function buildResponsesPayload(req: LLMRequest, stream = false): Record<string, 
     temperature: req.temperature,
     max_output_tokens: req.max_tokens,
     stream,
+    store: false,
   };
 }
 
