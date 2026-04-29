@@ -88,7 +88,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 48 Heaper adapter migration checklist and contract gaps.
 - [x] Add Slice 49 Heaper migration checklist contract test references.
 - [x] Add Slice 50 notification outbox integration in runtime and continuation worker.
-- [ ] Add Slice 51 audit export support for notification outbox refs.
+- [x] Add Slice 51 audit export support for notification outbox refs.
 - [ ] Add Slice 52 runtime-status JSON output mode.
 - [ ] Add Slice 53 task resume command for approval-resume tasks.
 - [ ] Add Slice 54 typed link relation design note.
@@ -679,7 +679,7 @@ Validation:
 
 Status: implemented with optional `notificationOutboxHeap` on runtime and continuation worker inputs. Runtime outcomes now expose `notificationOutboxRef` when configured; runtime blocked errors can carry a persisted outbox ref; continuation worker processed entries expose `notificationOutboxRef`; worker silent progress is persisted as summarized outbox blocks while non-silent intents are still returned for delivery.
 
-### Slice 51 — Audit export support for notification outbox refs
+### Slice 51 — Audit export support for notification outbox refs ✅
 
 Goal: make notification outbox trails easier to inspect.
 
@@ -687,6 +687,8 @@ Validation:
 - outbox blocks receive a `[notification]` label in audit export;
 - exported data includes delivery state and source refs;
 - redaction still applies to message content.
+
+Status: implemented in `src/cli/audit-export.ts`; blocks tagged `notification-outbox` now render with the `[notification]` audit label, include status/source/delivery target/source refs in exported data, and continue to use the existing redaction path for notification message content.
 
 ### Slice 52 — Runtime-status JSON output mode
 

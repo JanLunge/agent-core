@@ -109,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 50 — Notification outbox integration in runtime and continuation worker');
-    expect(report.text).toContain('Active slice: Slice 51 — Audit export support for notification outbox refs');
+    expect(report.text).toContain('Completed slice: Slice 51 — Audit export support for notification outbox refs');
+    expect(report.text).toContain('Active slice: Slice 52 — Runtime-status JSON output mode');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {

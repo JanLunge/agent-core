@@ -50,6 +50,7 @@ const TYPE_LABELS: Record<string, string> = {
   'task': 'task',
   'daily-entry': 'daily',
   'audit-snapshot': 'snapshot',
+  'notification-outbox': 'notification',
 };
 
 /**

@@ -172,6 +172,42 @@ describe('audit export', () => {
     });
   });
 
+  it('labels notification outbox blocks and preserves delivery state with redacted message content', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'notify', now: () => '2026-04-28T15:05:00.000Z' });
+    const task = await memory.createBlock({ heap: 'agent/tasks', type: 'task', data: { status: 'running', title: 'notify me' }, tags: ['task'] });
+    const result = await memory.createBlock({ heap: 'agent/results', type: 'text', data: { summary: 'result ready' }, tags: ['task-result'], links: [{ heap: task.heap, id: task.id }] });
+    const notification = await memory.createBlock({
+      heap: 'agent/notifications',
+      type: 'metadata',
+      data: {
+        status: 'queued',
+        source: 'worker',
+        deliveryTarget: 'telegram:jan',
+        intent: {
+          action: 'notify',
+          priority: 'high',
+          audience: 'human',
+          reason: 'A blocker needs attention.',
+          message: 'blocked because token=supersecret',
+          refs: [{ heap: task.heap, id: task.id }, { heap: result.heap, id: result.id }],
+        },
+        createdAt: '2026-04-28T15:05:00.000Z',
+      },
+      tags: ['notification-outbox', 'status:queued', 'action:notify', 'priority:high', 'audience:human', 'source:worker'],
+      links: [{ heap: task.heap, id: task.id }, { heap: result.heap, id: result.id }],
+      metadata: { source: 'notification-outbox', deliveryAttempted: false },
+    });
+
+    const text = await exportAuditTrail({ memory, startRef: { heap: task.heap, id: task.id }, maxDepth: 2 });
+
+    expect(text).toContain(`${notification.heap}#${notification.id} [notification] type=metadata`);
+    expect(text).toContain('"status":"queued"');
+    expect(text).toContain('"source":"worker"');
+    expect(text).toContain('"deliveryTarget":"telegram:jan"');
+    expect(text).toContain('token=[REDACTED]');
+    expect(text).not.toContain('supersecret');
+  });
+
   it('runs against LocalHeaperMemory stores and parses refs', async () => {
     const dir = await mkdtemp(join(tmpdir(), 'agent-core-audit-export-'));
     const storePath = join(dir, 'memory.json');
