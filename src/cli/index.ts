@@ -3,6 +3,7 @@
 import { Command } from 'commander';
 import { resolve } from 'node:path';
 import { readFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import * as readline from 'node:readline';
 import { loadConfig } from '../config/loader.js';
 import { createProvider, initProviders, setSecretResolver } from '../llm/client.js';
@@ -181,6 +182,8 @@ program
     const telegramToken = secretResolver?.resolve('TELEGRAM_BOT_TOKEN', 'telegram')
       ?? telegramConfig.token
       ?? process.env.TELEGRAM_BOT_TOKEN;
+    console.log(`[startup] agent-core ${runtimeBuildLabel(baseDir)}`);
+    console.log(`[startup] Telegram configured: enabled=${telegramConfig.enabled} token=${telegramToken ? 'present' : 'missing'}`);
     if (telegramConfig.enabled && !telegramToken) {
       console.error('Telegram is enabled, but no bot token is available. Set TELEGRAM_BOT_TOKEN, configure telegram.token, or disable telegram.enabled.');
       for (const fn of shutdownHandlers.reverse()) fn();
@@ -194,7 +197,7 @@ program
         allowedGroups: telegramConfig.allowed_groups,
       });
       await telegram.start();
-      console.log(`Telegram bot started for ${agentConfig.name}`);
+      console.log(`[startup] Telegram bot started for ${agentConfig.name}`);
       shutdownHandlers.push(() => telegram.stop());
     }
 
@@ -600,6 +603,16 @@ function resolveProvider(config: ReturnType<typeof loadConfig>, providerName: st
 
   console.warn('No API key found. Trying local LLM at http://localhost:1234/v1');
   return createProvider({ name: 'local', type: 'local', base_url: 'http://localhost:1234/v1' });
+}
+
+function runtimeBuildLabel(baseDir: string): string {
+  try {
+    const sha = execSync('git rev-parse --short HEAD', { cwd: baseDir, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    const dirty = execSync('git status --short', { cwd: baseDir, stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+    return dirty ? `${sha} (dirty)` : sha;
+  } catch {
+    return 'unknown-build';
+  }
 }
 
 program.parse();

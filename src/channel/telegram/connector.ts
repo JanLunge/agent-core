@@ -110,6 +110,7 @@ export class TelegramConnector {
           lastFileTarget: this.lastFileTargetsByChat.get(chatKey),
         });
         if (operation) {
+          console.log(`[telegram] intercepted direct operation: ${operation.kind} ${operation.target}`);
           if (operation.kind === 'file.write' || operation.kind === 'file.delete') {
             this.lastFileTargetsByChat.set(chatKey, operation.target);
           }
