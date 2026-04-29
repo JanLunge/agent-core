@@ -30,10 +30,7 @@ function renderMessages(messages: Message[]): string {
 }
 
 function buildPrompt(req: LLMRequest): string {
-  const unsupported = req.tools?.length
-    ? '\n\nNote: tool schemas were provided by agent-core, but the Codex CLI provider currently treats Codex as the model boundary and does not pass function-calling schemas through.'
-    : '';
-  return `${renderMessages(req.messages)}${unsupported}`;
+  return renderMessages(req.messages);
 }
 
 async function defaultCodexCliRunner(req: CodexCliRunRequest): Promise<string> {
@@ -86,6 +83,10 @@ export function createCodexCliProvider(
     name,
 
     async complete(req: LLMRequest): Promise<LLMResponse> {
+      if (req.tools?.length) {
+        throw new Error('Codex CLI provider cannot run tool-capable turns. Tool execution must stay inside the agent-core harness with approval/audit; configure a function-calling provider or use a non-tool request.');
+      }
+
       const dir = await mkdtemp(join(tmpdir(), 'agent-core-codex-'));
       const outputFile = join(dir, 'last-message.txt');
       const command = opts.command ?? 'codex';

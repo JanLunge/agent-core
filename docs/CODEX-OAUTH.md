@@ -1,36 +1,32 @@
-# Codex OAuth Provider
+# Codex API Provider
 
-Agent Core can use OpenAI/ChatGPT OAuth through the official Codex CLI instead of storing API keys in Agent Core config.
+Agent Core's normal assistant runtime must use an API-style provider, not the Codex CLI harness. This keeps tool execution, approvals, and audit inside Agent Core.
 
 ## Boundary
 
-Agent Core does **not** read `.env` files, Codex auth files, OAuth token files, or raw credentials. The `codex-cli` provider shells out to `codex exec`; the Codex CLI owns OAuth login, refresh, and token storage.
-
-## One-time setup owned by Jan
-
-Run this yourself in a terminal:
-
-```bash
-codex login
-```
-
-Follow the browser/device OAuth flow. After that, Agent Core can use the existing Codex CLI login.
+Agent Core does **not** let Codex CLI execute normal assistant/tool-capable turns. `codex-cli` is a harness for delegated coding work only. The normal Mira runtime should use `openai-codex` or another function-calling API provider so Agent Core owns the model/tool loop.
 
 ## Current project config
 
-`config.yaml` uses:
+`config.yaml` uses the API-style Codex route:
 
 ```yaml
 providers:
-  - name: codex
+  - name: codex-api
+    type: openai-codex
+    api_key_env: OPENAI_CODEX_ACCESS_TOKEN
+    default_model: gpt-5.5
+  - name: codex-cli-harness
     type: codex-cli
     command: codex
     default_model: gpt-5.5
-default_provider: codex
+default_provider: codex-api
 default_model: gpt-5.5
 ```
 
 `roles/companion.yaml` defaults Mira to `gpt-5.5`.
+
+If `OPENAI_CODEX_ACCESS_TOKEN` is missing, startup fails loudly rather than falling back to Codex CLI.
 
 ## Verify
 

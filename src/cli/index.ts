@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { execSync } from 'node:child_process';
 import * as readline from 'node:readline';
 import { loadConfig } from '../config/loader.js';
-import { createProvider, initProviders, setSecretResolver } from '../llm/client.js';
+import { createProvider, initProviders, resolveApiKey, setSecretResolver } from '../llm/client.js';
 import { createAgent } from '../agent/agent.js';
 import { ConversationStore } from '../conversation/persistence.js';
 import { createRouter } from '../router/router.js';
@@ -94,8 +94,22 @@ async function setupAgent(opts: { dir: string; agent?: string; model?: string })
 
   if (opts.model) agentConfig.model = opts.model;
 
+  const providerProfile = config.master.providers.find((p) => p.name === agentConfig.provider);
+  if (!providerProfile) {
+    console.error(`Provider "${agentConfig.provider}" not found. Available: ${config.master.providers.map((p) => p.name).join(', ')}`);
+    process.exit(1);
+  }
+  if (providerProfile.type === 'codex-cli') {
+    console.error('Provider type codex-cli is a harness, not a normal live assistant provider. Configure an API-style provider such as openai-codex so agent-core owns tools, approvals, and audit.');
+    process.exit(1);
+  }
+  if (['openai-compatible', 'anthropic', 'openai-codex'].includes(providerProfile.type) && !resolveApiKey(providerProfile, secretResolver)) {
+    console.error(`Provider "${providerProfile.name}" (${providerProfile.type}) needs credentials. Set ${providerProfile.api_key_env ?? `${providerProfile.name}_api_key`} or configure a vault secret.`);
+    process.exit(1);
+  }
+
   const costTracker = new CostTracker();
-  const rawProvider = resolveProvider(config, agentConfig.provider);
+  const rawProvider = createProvider(providerProfile, secretResolver);
   const provider = createCostTrackingProvider(rawProvider, costTracker);
   const store = new ConversationStore(dataDir);
   const traceStore = new TraceStore(dataDir);

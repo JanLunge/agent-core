@@ -28,4 +28,23 @@ describe('Codex CLI provider', () => {
     ]));
     expect(captured?.prompt).toContain('USER: ping');
   });
+
+  it('refuses tool-capable turns before Codex can execute anything itself', async () => {
+    let called = false;
+    const provider = createCodexCliProvider('codex', { command: 'codex', timeoutMs: 1_000 }, async () => {
+      called = true;
+      return 'should-not-run';
+    });
+
+    await expect(provider.complete({
+      model: 'gpt-5.5',
+      messages: [{ role: 'user', content: 'delete /Users/ulflunge/Desktop/a.md' }],
+      tools: [{
+        name: 'exec',
+        description: 'Execute a shell command through agent-core approval harness',
+        parameters: { type: 'object' },
+      }],
+    })).rejects.toThrow('Tool execution must stay inside the agent-core harness');
+    expect(called).toBe(false);
+  });
 });

@@ -292,6 +292,11 @@ export class TelegramConnector {
       }
 
       const finalText = result.reply || '(no response)';
+      const blockedDesktopTarget = extractBlockedDesktopTarget(finalText);
+      if (blockedDesktopTarget && chatId !== undefined) {
+        this.lastFileTargetsByChat.set(String(chatId), blockedDesktopTarget);
+        console.log(`[telegram] remembered blocked Desktop target for retry: ${blockedDesktopTarget}`);
+      }
 
       // Replace the placeholder with the final response
       const chunks = splitMessage(finalText);
@@ -350,6 +355,12 @@ export class TelegramConnector {
 function formatApprovalArgs(args: Record<string, unknown>): string {
   const json = JSON.stringify(args, null, 2) ?? '{}';
   return json.length > 1_500 ? `${json.slice(0, 1_500)}\n…[truncated]` : json;
+}
+
+function extractBlockedDesktopTarget(text: string): string | undefined {
+  if (!/Operation not permitted|read-only/i.test(text)) return undefined;
+  const match = text.match(/\/Users\/[^\s`'\"]+\/Desktop\/[^\s`'\"]+\.(?:md|txt)/i);
+  return match?.[0];
 }
 
 async function withApprovalTimeout(

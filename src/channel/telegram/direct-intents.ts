@@ -51,12 +51,13 @@ export function parseDirectFileDeleteIntent(
 ): OperationIntent | undefined {
   const normalized = text.trim();
   const lower = normalized.toLowerCase();
-  if (!/\b(remove|delete|trash|rm)\b/.test(lower)) return undefined;
+  const hasDeleteVerb = /\b(remove|delete|trash|rm)\b/.test(lower);
+  const contextualDelete = /\b(it|that|this|again)\b/.test(lower) || /\btry\s+again\b/.test(lower);
+  if (!hasDeleteVerb && !(contextualDelete && options.lastFileTarget)) return undefined;
 
   const explicitDesktop = /\bdesktop\b/.test(lower);
   const explicitPath = extractDesktopPath(normalized);
   const fileName = explicitPath ? undefined : extractFileName(lower);
-  const contextualDelete = /\b(it|that|this|again)\b/.test(lower);
   const path = explicitPath
     ?? (fileName
       // For this early bridge, bare filenames are scoped to Desktop because the
