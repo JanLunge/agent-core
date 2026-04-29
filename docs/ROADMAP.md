@@ -91,7 +91,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 51 audit export support for notification outbox refs.
 - [x] Add Slice 52 runtime-status JSON output mode.
 - [x] Add Slice 53 task resume command for approval-resume tasks.
-- [ ] Add Slice 54 typed link relation design note.
+- [x] Add Slice 54 typed link relation design note.
 - [ ] Add Slice 55 semantic time-range translation helper.
 - [ ] Add Slice 56 pagination-safe memory scan wrapper.
 - [ ] Add Slice 57 permission policy adapter boundary tests.
@@ -712,7 +712,7 @@ Validation:
 
 Status: implemented with `agent-core task-resume --store <path> [--mark-ready]`. The command lists pending approval-resume tasks, resolves their approval refs and exact proposed operations, and can mark tasks ready for continuation by tagging/updating the task without executing the approved operation.
 
-### Slice 54 — Typed link relation design note
+### Slice 54 — Typed link relation design note ✅
 
 Goal: decide how untyped local links map to future typed Heaper relations.
 
@@ -720,6 +720,8 @@ Validation:
 - documents candidate relation names;
 - maps current link use sites;
 - identifies migration-safe default for untyped legacy links.
+
+Status: documented in `docs/LINK-RELATIONS.md`; the design keeps `links?: BlockRef[]` as the compatibility field, imports legacy links as `related`, proposes typed relation names, maps current runtime/task/approval/tool/delegation/audit use sites, and outlines a migration plan that preserves existing traversal behavior.
 
 ### Slice 55 — Semantic time-range translation helper
 

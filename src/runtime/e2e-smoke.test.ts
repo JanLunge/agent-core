@@ -109,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 53 — Task resume command for approval-resume tasks');
-    expect(report.text).toContain('Active slice: Slice 54 — Typed link relation design note');
+    expect(report.text).toContain('Completed slice: Slice 54 — Typed link relation design note');
+    expect(report.text).toContain('Active slice: Slice 55 — Semantic time-range translation helper');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {
