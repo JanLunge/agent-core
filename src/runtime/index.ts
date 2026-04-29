@@ -13,12 +13,6 @@ export type {
   RuntimeResponderInput,
 } from './orchestrator.js';
 
-export { createFakeAgentHarness } from './fake-agent.js';
-export type {
-  FakeAgentHarness,
-  FakeAgentScriptStep,
-} from './fake-agent.js';
-
 export {
   createRuntimeMemory,
 } from './memory-config.js';

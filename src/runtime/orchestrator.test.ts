@@ -82,6 +82,40 @@ describe('runRuntimeEvent', () => {
     });
   });
 
+  it('fails closed instead of producing fake output when no responder is configured', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    await expect(runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-no-responder', channelType: 'telegram', chatId: 'jan', text: '@mira hello' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      blockerHeap: 'agent/blockers',
+      modelPolicy,
+      availableModels,
+    } as unknown as Parameters<typeof runRuntimeEvent>[0])).rejects.toMatchObject({
+      name: 'RuntimeBlockedError',
+      blockerRef: { heap: 'agent/blockers', id: 'block-6' },
+    });
+
+    await expect(memory.getBlock({ heap: 'agent/blockers', id: 'block-6' })).resolves.toMatchObject({
+      data: {
+        operation: 'run runtime responder',
+        details: 'Error: Runtime responder is required; configure a provider-backed responder or explicit test responder',
+      },
+      links: [
+        { heap: 'agent/sessions', id: 'block-2' },
+        { heap: 'agent/audit', id: 'block-1' },
+        { heap: 'agent/audit', id: 'block-3' },
+        { heap: 'agent/audit', id: 'block-4' },
+        { heap: 'agent/sessions', id: 'block-5' },
+      ],
+    });
+  });
+
   it('writes session messages and auditable decision blocks to the configured heaps', async () => {
     const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
     const router = createRouter();
@@ -95,6 +129,7 @@ describe('runRuntimeEvent', () => {
       auditHeap: 'agent/audit',
       modelPolicy,
       availableModels,
+      responder: ({ event }) => `reply:${event.content}`,
     });
 
     await expect(memory.getBlock(outcome.userMessageRef)).resolves.toMatchObject({
@@ -244,6 +279,7 @@ describe('runRuntimeEvent', () => {
       personaConfigHeap: 'agent/personas',
       modelPolicy,
       availableModels,
+      responder: ({ event }) => `reply:${event.content}`,
     })).rejects.toMatchObject({
       name: 'RuntimeBlockedError',
       blockerRef: { heap: 'agent/blockers', id: 'block-3' },
@@ -447,6 +483,7 @@ describe('runRuntimeEvent', () => {
         { surface: 'file', action: 'read', target: '/workspace/notes.md' },
         { surface: 'api', action: 'network', target: 'https://api.example.test/private' },
       ],
+      responder: ({ event }) => `reply:${event.content}`,
     });
 
     expect(outcome.model).toMatchObject({ model: 'local/small', requirement: 'local-required' });
@@ -484,6 +521,7 @@ describe('runRuntimeEvent', () => {
         blockerHeap: 'agent/blockers',
         modelPolicy,
         availableModels: [{ id: 'remote/default', capabilities: ['remote'] }],
+        responder: ({ event }) => `reply:${event.content}`,
       });
     } catch (err) {
       caught = err;

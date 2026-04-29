@@ -28,9 +28,7 @@ import { Vault } from '../secrets/vault.js';
 import { AuditLog } from '../secrets/audit.js';
 import { SecretResolver } from '../secrets/resolver.js';
 import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
-import { runRuntimeSmoke } from './runtime-smoke.js';
 import { runRuntimeDogfood } from './runtime-dogfood.js';
-import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
 import { runAuditExport, runAuditSnapshot } from './audit-export.js';
 import { renderTelegramAuditFixture, runTelegramAuditFixture } from './audit-export-fixture.js';
 import { renderRuntimeStatusJson, runRuntimeStatus } from './runtime-status.js';
@@ -286,27 +284,6 @@ program
   });
 
 program
-  .command('runtime-smoke <message>')
-  .description('Run a deterministic local runtime smoke path without external services')
-  .option('-p, --persona <name>', 'Persona/agent name', 'mira')
-  .option('-s, --store <path>', 'Local HeaperMemory JSON store path')
-  .option('-c, --channel <id>', 'Synthetic channel id', 'local')
-  .action(async (message: string, opts: { persona: string; store?: string; channel: string }) => {
-    try {
-      const result = await runRuntimeSmoke({
-        message,
-        persona: opts.persona,
-        storePath: opts.store ? resolve(opts.store) : undefined,
-        channel: opts.channel,
-      });
-      console.log(result.lines.join('\n'));
-    } catch (err) {
-      console.error('Runtime smoke failed:', err instanceof Error ? err.message : err);
-      process.exit(1);
-    }
-  });
-
-program
   .command('runtime-dogfood <message>')
   .description('Run one local Telegram-shaped runtime turn through durable memory and an explicit real-provider seam')
   .option('-d, --dir <path>', 'Base directory', '.')
@@ -430,32 +407,6 @@ program
       console.error('Audit export fixture failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
-  });
-
-program
-  .command('runtime-telegram-spike')
-  .description('Run a Telegram bot that exercises the new runtime path with durable memory, routing, guards, approvals, and audit refs')
-  .requiredOption('-s, --store <path>', 'Local HeaperMemory JSON store path')
-  .option('-t, --token <token>', 'Telegram bot token; defaults to TELEGRAM_BOT_TOKEN env var')
-  .option('-u, --allowed-user <id...>', 'Allowed Telegram user id(s)')
-  .action(async (opts: { store: string; token?: string; allowedUser?: string[] }) => {
-    const token = opts.token ?? process.env.TELEGRAM_BOT_TOKEN;
-    if (!token) {
-      console.error('Runtime Telegram spike needs --token or TELEGRAM_BOT_TOKEN.');
-      process.exit(1);
-    }
-    const allowedUsers = opts.allowedUser?.map((id) => Number(id)).filter(Number.isFinite);
-    const { stop } = await startRuntimeTelegramSpike({
-      token,
-      storePath: resolve(opts.store),
-      allowedUsers: allowedUsers && allowedUsers.length > 0 ? allowedUsers : undefined,
-    });
-    const shutdown = () => {
-      stop();
-      process.exit(0);
-    };
-    process.on('SIGINT', shutdown);
-    process.on('SIGTERM', shutdown);
   });
 
 const secrets = program.command('secrets').description('Manage encrypted secrets vault');

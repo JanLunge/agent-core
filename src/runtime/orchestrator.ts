@@ -38,7 +38,8 @@ export interface RunRuntimeEventInput {
   complexity?: TaskComplexity;
   guardRequests?: GuardRequest[];
   history?: Message[];
-  responder?: RuntimeResponder;
+  /** Required: product/runtime callers must cross an explicit responder/provider boundary. */
+  responder: RuntimeResponder;
 }
 
 export interface RuntimeOutcome {
@@ -77,10 +78,10 @@ export class RuntimeBlockedError extends Error {
 /**
  * Testable runtime orchestration skeleton.
  *
- * It stitches the early boundaries together without real LLM calls: normalize is
- * already done by callers, then this records event/route/model/guard decisions,
- * builds bounded working memory, calls a supplied responder, and persists user
- * and assistant message blocks by reference.
+ * It stitches runtime boundaries together: normalize is already done by callers,
+ * then this records event/route/model/guard decisions, builds bounded working
+ * memory, calls an explicit responder/provider boundary, and persists user and
+ * assistant message blocks by reference.
  */
 export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<RuntimeOutcome> {
   const blockerHeap = input.blockerHeap ?? input.auditHeap;
@@ -238,7 +239,8 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
 
   let reply: string;
   try {
-    reply = await (input.responder ?? defaultResponder)({ event: input.event, route, workingMemory, model, guardDecisions });
+    if (!input.responder) throw new Error('Runtime responder is required; configure a provider-backed responder or explicit test responder');
+    reply = await input.responder({ event: input.event, route, workingMemory, model, guardDecisions });
   } catch (err) {
     const blocker = await createRuntimeBlockerBlock({
       memory: input.memory,
@@ -359,10 +361,6 @@ function notificationTriggerFor(mode: NormalizedEvent['modeHint'], guardDecision
   if (mode === 'live') return 'live-response';
   if (mode === 'background') return 'background-progress';
   return 'async-progress';
-}
-
-function defaultResponder(input: RuntimeResponderInput): string {
-  return `Prepared runtime context for ${input.route.agentName}: ${input.event.content}`;
 }
 
 function refFor(block: HeaperBlock): BlockRef {

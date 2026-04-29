@@ -109,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Beta Slice 1 — Dogfood runtime command with real provider seam');
-    expect(report.text).toContain('Active slice: Beta Slice 2 — Replace fake agent on dogfood path');
+    expect(report.text).toContain('Completed slice: Beta Slice 2 — Replace fake agent on dogfood path');
+    expect(report.text).toContain('Active slice: Beta Slice 3 — Debuggable store inspector for one run');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {
