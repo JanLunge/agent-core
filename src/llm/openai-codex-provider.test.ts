@@ -127,6 +127,29 @@ describe('openai-codex provider', () => {
     ]);
   });
 
+  it('drops orphaned historical function calls without matching tool output', async () => {
+    const fetchMock = vi.fn(async () => sseResponse([
+      { type: 'response.output_text.delta', delta: 'ok' },
+      { type: 'response.completed', response: { model: 'gpt-5.5', status: 'completed' } },
+    ]));
+    const provider = createOpenAICodexProvider('codex-subscription', {
+      accessToken: 'test-token',
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await provider.complete({
+      model: 'gpt-5.5',
+      messages: [
+        { role: 'assistant', content: '', tool_calls: [{ id: 'call_orphan|fc_orphan', type: 'function', function: { name: 'exec', arguments: '{"command":"pwd"}' } }] },
+        { role: 'user', content: 'try again' },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: 'try again' }] }]);
+  });
+
   it('streams text chunks and done events from Codex Responses SSE', async () => {
     const fetchMock = vi.fn(async () => sseResponse([
       { type: 'response.output_text.delta', delta: 'he' },

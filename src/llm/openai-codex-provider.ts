@@ -20,18 +20,40 @@ function toResponsesInstructions(messages: Message[]): string {
     .join('\n\n');
 }
 
+function splitToolCallId(id: string | undefined): { callId: string; itemId?: string } {
+  const [callId = '', itemId] = (id ?? '').split('|');
+  return { callId, itemId };
+}
+
 function toResponsesInput(messages: Message[]): unknown[] {
   const input: unknown[] = [];
+  const toolOutputCallIds = new Set(messages
+    .filter((message) => message.role === 'tool')
+    .map((message) => splitToolCallId(message.tool_call_id).callId)
+    .filter(Boolean));
+  const assistantCallIds = new Set(messages
+    .flatMap((message) => message.role === 'assistant' ? message.tool_calls ?? [] : [])
+    .map((toolCall) => splitToolCallId(toolCall.id).callId)
+    .filter(Boolean));
+
   for (const message of messages) {
     if (message.role === 'system') continue;
     if (message.role === 'tool') {
-      const [callId] = (message.tool_call_id ?? '').split('|');
-      input.push({ type: 'function_call_output', call_id: callId || message.tool_call_id, output: message.content });
+      const { callId } = splitToolCallId(message.tool_call_id);
+      if (callId && assistantCallIds.has(callId)) {
+        input.push({ type: 'function_call_output', call_id: callId, output: message.content });
+      }
       continue;
     }
     if (message.role === 'assistant' && message.tool_calls?.length) {
       for (const toolCall of message.tool_calls) {
-        const [callId, itemId] = toolCall.id.split('|');
+        const { callId, itemId } = splitToolCallId(toolCall.id);
+        // Codex Responses rejects replayed function calls that do not have a
+        // matching function_call_output in the same input. This can happen if a
+        // previous process crashed, approval was never completed, or older buggy
+        // code stored a call without a result. Drop those orphaned calls so one
+        // bad historical turn does not poison the whole active conversation.
+        if (!callId || !toolOutputCallIds.has(callId)) continue;
         input.push({
           type: 'function_call',
           id: itemId,
