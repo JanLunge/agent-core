@@ -28,6 +28,7 @@ import { AuditLog } from '../secrets/audit.js';
 import { SecretResolver } from '../secrets/resolver.js';
 import { CostTracker, createCostTrackingProvider } from '../llm/cost.js';
 import { runRuntimeSmoke } from './runtime-smoke.js';
+import { runRuntimeDogfood } from './runtime-dogfood.js';
 import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
 import { runAuditExport, runAuditSnapshot } from './audit-export.js';
 import { renderTelegramAuditFixture, runTelegramAuditFixture } from './audit-export-fixture.js';
@@ -279,6 +280,30 @@ program
       console.log(result.lines.join('\n'));
     } catch (err) {
       console.error('Runtime smoke failed:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('runtime-dogfood <message>')
+  .description('Run one local Telegram-shaped runtime turn through durable memory and an explicit real-provider seam')
+  .option('-d, --dir <path>', 'Base directory', '.')
+  .option('-a, --agent <name>', 'Agent name (defaults to first configured agent)')
+  .option('-s, --store <path>', 'Local HeaperMemory JSON store path')
+  .option('-c, --channel <id>', 'Synthetic Telegram replay chat id', 'local-dogfood')
+  .action(async (message: string, opts: { dir: string; agent?: string; store?: string; channel: string }) => {
+    try {
+      const result = await runRuntimeDogfood({
+        baseDir: resolve(opts.dir),
+        message,
+        agent: opts.agent,
+        storePath: opts.store ? resolve(opts.store) : undefined,
+        channel: opts.channel,
+      });
+      console.log(result.lines.join('\n'));
+      if (result.blocked) process.exit(2);
+    } catch (err) {
+      console.error('Runtime dogfood failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
   });

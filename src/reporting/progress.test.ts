@@ -91,6 +91,35 @@ describe('generateProgressReport', () => {
     expect(report.blockers).toEqual(['None recorded']);
   });
 
+  it('understands beta slice queues after the alpha roadmap closes', () => {
+    const { cwd, roadmapPath } = tempRoadmap();
+    writeFileSync(roadmapPath, `# Roadmap
+
+## Beta Active Slice Queue
+
+### Beta Slice 0 — Product-path audit ✅
+
+Status: completed.
+
+### Beta Slice 1 — Dogfood runtime command with real provider seam ✅
+
+Status: completed.
+
+### Beta Slice 2 — Replace fake agent on dogfood path
+
+Status: active.
+`);
+
+    const report = generateProgressReport({ cwd, roadmapPath, exec: () => 'beef123 Beta progress\n' });
+
+    expect(report.completedSlices).toEqual([
+      'Beta Slice 0 — Product-path audit',
+      'Beta Slice 1 — Dogfood runtime command with real provider seam',
+    ]);
+    expect(report.activeSlice).toBe('Beta Slice 2 — Replace fake agent on dogfood path');
+    expect(report.text).toContain('Completed slice: Beta Slice 1 — Dogfood runtime command with real provider seam');
+  });
+
   it('reports active runtime blockers alongside roadmap blockers', () => {
     const { cwd, roadmapPath } = tempRoadmap();
 

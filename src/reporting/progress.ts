@@ -47,8 +47,10 @@ export function generateProgressReport(options: ProgressReporterOptions): Progre
   const roadmap = readFileSync(options.roadmapPath ?? join(options.cwd, 'docs/ROADMAP.md'), 'utf8');
   const latestCommit = latestCommitFor(options);
   const slices = parseSlices(roadmap);
-  const completedSlices = slices.filter((slice) => slice.completed).map((slice) => slice.title);
   const activeIndex = slices.findIndex((slice) => !slice.completed);
+  const completedSlices = (activeIndex >= 0 ? slices.slice(0, activeIndex) : slices)
+    .filter((slice) => slice.completed)
+    .map((slice) => slice.title);
   const activeSlice = activeIndex >= 0 ? slices[activeIndex].title : undefined;
   const nextSlices = activeIndex >= 0 ? slices.slice(activeIndex + 1, activeIndex + 4).map((slice) => slice.title) : [];
   const blockers = mergeActiveBlockers(parseBlockers(roadmap), options.activeBlockers);
@@ -84,9 +86,9 @@ function defaultExec(command: string, args: string[], cwd: string): string {
 }
 
 function parseSlices(roadmap: string): Array<{ title: string; completed: boolean }> {
-  return Array.from(roadmap.matchAll(/^###\s+(Slice\s+\d+\s+—\s+.+)$/gm), (match) => ({
+  return Array.from(roadmap.matchAll(/^###\s+((?:Beta\s+)?Slice\s+\d+\s+—\s+.+)$/gm), (match) => ({
     title: match[1].replace(/\s+✅\s*$/, '').trim(),
-    completed: match[1].includes('✅'),
+    completed: match[0].includes('✅'),
   }));
 }
 

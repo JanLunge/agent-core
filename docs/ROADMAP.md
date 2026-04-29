@@ -98,6 +98,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 57 permission policy adapter boundary tests.
 - [x] Add Slice 58 Heaper adapter skeleton behind feature flag.
 - [x] Beta Slice 0 product-path audit and fake/stub blocker list.
+- [x] Beta Slice 1 dogfood runtime command with real provider seam.
 
 
 ## Product Phase Change — Beta Slice 0 starts 2026-04-29
@@ -132,7 +133,7 @@ Validation:
 
 Status: completed in `docs/BETA-0-AUDIT.md`. The audit identifies seven product-path blockers, including fake-agent responders, placeholder model ids, the runtime default responder, Telegram still using the old path, fixture tools, non-functional Heaper adapter, and tool-call fallback stubs.
 
-### Beta Slice 1 — Dogfood runtime command with real provider seam
+### Beta Slice 1 — Dogfood runtime command with real provider seam ✅
 
 Goal: create or adapt a single command that runs one local Telegram-like conversation through the actual runtime path and makes provider choice explicit.
 
@@ -142,7 +143,7 @@ Validation:
 - uses a real provider when configured, otherwise fails with a clear blocker instead of silently using a fake;
 - prints debug pointers: session id, route decision, memory blocks, audit refs, notification intents.
 
-Status: active.
+Status: completed with `runtime-dogfood`, `src/cli/runtime-dogfood.ts`, and `src/runtime/provider-responder.ts`. The command runs a Telegram-replay-shaped turn through `runRuntimeEvent`, durable LocalHeaperMemory, model routing, session/daily memory, and a provider-backed responder seam. Missing configured credentials return an explicit blocker instead of fake output.
 
 ### Beta Slice 2 — Replace fake agent on dogfood path
 
@@ -153,7 +154,7 @@ Validation:
 - missing credentials/config become explicit blockers;
 - fake agent remains only in unit tests and is labelled as such.
 
-Status: planned.
+Status: active.
 
 ### Beta Slice 3 — Debuggable store inspector for one run
 
