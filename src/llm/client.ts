@@ -2,6 +2,7 @@ import type { ProviderProfile } from '../config/schema.js';
 import type { LLMProvider } from './types.js';
 import type { SecretResolver } from '../secrets/resolver.js';
 import { createOpenAIProvider } from './openai-provider.js';
+import { createOpenAICodexProvider } from './openai-codex-provider.js';
 import { createCodexCliProvider } from './codex-cli-provider.js';
 
 const providers = new Map<string, LLMProvider>();
@@ -49,6 +50,14 @@ export function createProvider(profile: ProviderProfile, resolver?: SecretResolv
       return createOpenAIProvider(profile.name, {
         apiKey: apiKey ?? 'local',
         baseURL: profile.base_url ?? 'http://localhost:11434/v1',
+      });
+
+    case 'openai-codex':
+      // ChatGPT/Codex subscription API-style route. Unlike codex-cli, this is
+      // intended for the normal agent-core tool loop so approvals stay central.
+      return createOpenAICodexProvider(profile.name, {
+        accessToken: apiKey,
+        baseURL: profile.base_url,
       });
 
     case 'codex-cli':

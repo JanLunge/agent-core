@@ -4,7 +4,7 @@ import { z } from 'zod';
 
 export const ProviderProfileSchema = z.object({
   name: z.string(),
-  type: z.enum(['openai-compatible', 'anthropic', 'local', 'codex-cli']),
+  type: z.enum(['openai-compatible', 'anthropic', 'local', 'openai-codex', 'codex-cli']),
   base_url: z.string().optional(),
   api_key_env: z.string().optional(),
   api_key: z.string().optional(),

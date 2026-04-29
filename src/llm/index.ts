@@ -10,6 +10,13 @@ export type {
 } from './types.js';
 
 export { createOpenAIProvider } from './openai-provider.js';
+export {
+  createOpenAICodexProvider,
+  OPENAI_CODEX_API,
+  OPENAI_CODEX_BASE_URL,
+  OPENAI_CODEX_PROVIDER_NAME,
+  type OpenAICodexProviderOptions,
+} from './openai-codex-provider.js';
 
 export {
   createProvider,
