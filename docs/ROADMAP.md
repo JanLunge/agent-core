@@ -9,7 +9,8 @@ Every work session should end with:
 1. a committed, pushed, verified change if anything meaningful changed;
 2. an updated local `HEARTBEAT-STATE.md` entry;
 3. at least one concrete next step;
-4. no claim that the project is "done" unless Jan explicitly pauses it.
+4. a user-visible check-in if the active queue is empty/below 3, product direction is unclear, or work has drifted away from the fastest usable runtime;
+5. no claim that the project is "done" unless Jan explicitly pauses it.
 
 Use `docs/BUILD-ORDER.md` for phase-level acceptance tests and this file for rolling implementation slices.
 
@@ -97,7 +98,96 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 57 permission policy adapter boundary tests.
 - [x] Add Slice 58 Heaper adapter skeleton behind feature flag.
 
-## Active Slice Queue
+
+## Product Phase Change — Beta Slice 0 starts 2026-04-29
+
+Jan clarified that all completed slices up to Slice 58 were the **alpha stage**: useful scaffolding, contracts, and exploratory plumbing, but not enough by itself. The project is now in **beta**, and beta slices start again from **Beta Slice 0**.
+
+Beta goal:
+
+> Build a dogfoodable working version of agent-core that is easy to debug and develop on, while always optimizing toward an actual finished product.
+
+Beta rules:
+
+- Every beta slice must move a real product path forward, not merely add plausible architecture.
+- Prefer vertical integration over isolated modules.
+- The primary target is a working Telegram/runtime path with durable routing, session/memory, real agent/provider execution, tool/approval safety, notifications, and audit/status/debuggability.
+- Fake stubs/test doubles are allowed only as temporary development aids. They must be explicitly listed as blockers/debt and converted into real implementations via named beta tasks.
+- A test passing against a fake/stub does not count as product validation. Beta verification should use real runtime paths, real provider boundaries where possible, fixture replay, CLI smoke runs, and inspectable stores/logs.
+- If the next slice would add more scaffolding while a fake/stub remains on the product path, stop and replace the fake/stub first or list it as an explicit blocker with a task.
+- If product direction is unclear, check in with Jan instead of filling the queue with infrastructure work.
+
+## Beta Active Slice Queue
+
+### Beta Slice 0 — Product-path audit and fake/stub blocker list
+
+Goal: inventory the current alpha codebase from the perspective of dogfooding: what is real, what is fake/stubbed, what blocks a working Telegram/runtime product path, and what can be reused.
+
+Validation:
+- produces a concise beta audit document;
+- lists every known fake/stub on the product path;
+- turns each fake/stub into a blocker or beta task;
+- identifies the shortest vertical path to a dogfoodable runtime.
+
+Status: active.
+
+### Beta Slice 1 — Dogfood runtime command with real provider seam
+
+Goal: create or adapt a single command that runs one local Telegram-like conversation through the actual runtime path and makes provider choice explicit.
+
+Validation:
+- accepts a Telegram-shaped input fixture or CLI args;
+- writes to a durable local store;
+- uses a real provider when configured, otherwise fails with a clear blocker instead of silently using a fake;
+- prints debug pointers: session id, route decision, memory blocks, audit refs, notification intents.
+
+Status: planned after Beta Slice 0.
+
+### Beta Slice 2 — Replace fake agent on dogfood path
+
+Goal: ensure the dogfood path invokes a real agent/provider boundary rather than `FakeAgent` or deterministic text responses.
+
+Validation:
+- real provider adapter is selected/configurable;
+- missing credentials/config become explicit blockers;
+- fake agent remains only in unit tests and is labelled as such.
+
+Status: planned.
+
+### Beta Slice 3 — Debuggable store inspector for one run
+
+Goal: make one dogfood run easy to inspect without spelunking JSON manually.
+
+Validation:
+- command shows session, route history, messages, memory blocks, tool decisions, approvals, notifications, and blockers for a run;
+- output is human-readable and optionally JSON.
+
+Status: planned.
+
+### Beta Slice 4 — Real Telegram adapter dry-run/replay
+
+Goal: replay Telegram-shaped updates through the same adapter boundary used by production Telegram input, without requiring live message sending.
+
+Validation:
+- fixture update flows into normalized event and runtime orchestration;
+- channel/chat ids persist consistently;
+- output can be audited from the store.
+
+Status: planned.
+
+### Beta Slice 5 — Minimal live Telegram dogfood checkpoint
+
+Goal: define and run the smallest safe live Telegram test once local replay works.
+
+Validation:
+- clear config requirements;
+- no fake provider on path;
+- one inbound message produces one real response or an explicit approval/blocker;
+- logs/store make the run debuggable.
+
+Status: planned; requires Jan checkpoint before any external/live messaging.
+
+## Alpha Slice Archive
 
 ### Slice 1 — Session summary blocks ✅
 

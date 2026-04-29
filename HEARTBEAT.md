@@ -37,18 +37,37 @@ Core memory operations to design around:
 ## Per-Heartbeat Procedure
 
 1. Read the local ignored heartbeat state file (`HEARTBEAT-STATE.md`) if it exists.
-2. Read `docs/ROADMAP.md` and keep its Active Slice Queue non-empty.
-3. Pick one small productive step from the next-step list or project backlog.
-4. Do the work: edit docs, implement a small module, add a test, fix a failure, or write a decision record.
-5. Verify with the smallest meaningful gate (`pnpm test`, `pnpm typecheck`, targeted test, or direct inspection).
-6. Update the local ignored heartbeat state file with timestamp, files touched, verification, next step, and blockers.
-7. If a roadmap slice is completed, mark it and add/clarify the next slice before stopping. Never leave the roadmap with no concrete next step.
-8. Commit and push coherent changes.
-9. Notify Jan only for milestones, blockers, risky decisions, or meaningful failures. Otherwise use `NO_REPLY`.
+2. Read `docs/ROADMAP.md` and check for an active product checkpoint before taking another small slice.
+3. Prefer the fastest vertical path to a working, dogfoodable runtime over infrastructure-only work. A slice must either move the Telegram/runtime path closer to real use, remove a concrete blocker, or explicitly document a decision Jan needs.
+4. If the active queue is empty, below 3 slices, or has drifted into scaffolding without a visible product milestone, stop and notify Jan instead of silently continuing or ending with `NO_REPLY`.
+5. Do the work: edit docs, implement a small module, add a test, fix a failure, run a real smoke path, or write a decision record. Avoid generating code just because a slice exists.
+6. Verify with the strongest small gate available. Unit tests are not enough for runtime-facing slices; include a CLI/runtime smoke or fixture replay when possible.
+7. Update the local ignored heartbeat state file with timestamp, files touched, verification, next step, and blockers.
+8. If a roadmap slice is completed, mark it and add/clarify the next slice before stopping. Never leave the roadmap with no concrete next step.
+9. Commit and push coherent changes when the change is worth keeping.
+10. Notify Jan for empty/low roadmap, product-direction drift, milestones, blockers, risky decisions, or meaningful failures. Otherwise use `NO_REPLY`.
 
 ## Overnight Planning Rule
 
-Before Jan is likely away or asleep, keep at least **10 actionable roadmap slices** ready in `docs/ROADMAP.md`, plus explicit feedback checkpoints. If the queue drops below 10, extend the roadmap before doing more implementation. If a feedback checkpoint is reached, write the question into local `HEARTBEAT-STATE.md`, commit/push safe preparatory work, and switch to an unrelated safe slice when available instead of stopping all work.
+Before Jan is likely away or asleep, keep at least **10 actionable roadmap slices** ready in `docs/ROADMAP.md`, plus explicit feedback checkpoints. If the queue drops below 10, extend the roadmap before doing more implementation **only when the product direction is already clear**. If the next choices would affect product direction, UX, real-agent behavior, or what should be dogfooded next, ask Jan instead of filling the queue with plausible infrastructure work. If a feedback checkpoint is reached, write the question into local `HEARTBEAT-STATE.md`, commit/push safe preparatory work, and switch to an unrelated safe slice only if it still serves the active product milestone.
+
+## Beta Product Rule
+
+As of 2026-04-29, completed slices up to Slice 58 are alpha scaffolding. New work is **beta** and starts again from **Beta Slice 0**.
+
+Beta work must aim at a dogfoodable working product that is easy to debug and develop on. Every beta slice should move a real runtime path forward, remove a concrete blocker, or make the product easier to inspect/debug.
+
+Fake stubs/test doubles are not product progress by themselves. If a fake/stub appears on the dogfood path, list it as a blocker/debt item and create a beta task to replace it. Fake agents are allowed in unit tests only when explicitly labelled as test doubles.
+
+## Product Check-in Trigger
+
+Reach out immediately when any of these happen:
+
+- beta active roadmap queue is empty or below 3 slices;
+- no slice has exercised a real Telegram/runtime path in the last meaningful work block;
+- tests rely only on fake agents/harnesses for behavior Jan specifically said needs real agents/questions;
+- the next work would be scaffold-only while a fake/stub remains on the dogfood product path;
+- a slice discovers that current architecture may not produce a usable thing quickly.
 
 ## Product Backlog
 
