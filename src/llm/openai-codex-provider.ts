@@ -25,11 +25,7 @@ function toResponsesInput(messages: Message[]): unknown[] {
   for (const message of messages) {
     if (message.role === 'system') continue;
     if (message.role === 'tool') {
-      input.push({
-        type: 'function_call_output',
-        call_id: message.tool_call_id,
-        output: message.content,
-      });
+      input.push({ type: 'function_call_output', call_id: message.tool_call_id, output: message.content });
       continue;
     }
     if (message.role === 'assistant' && message.tool_calls?.length) {
@@ -43,10 +39,7 @@ function toResponsesInput(messages: Message[]): unknown[] {
       }
       if (!message.content) continue;
     }
-    input.push({
-      role: message.role,
-      content: message.content,
-    });
+    input.push({ role: message.role, content: message.content });
   }
   return input;
 }
@@ -61,7 +54,7 @@ function toResponsesTools(tools: ToolDefinition[] | undefined): unknown[] | unde
   }));
 }
 
-function buildResponsesPayload(req: LLMRequest, stream = false): Record<string, unknown> {
+function buildResponsesPayload(req: LLMRequest): Record<string, unknown> {
   return {
     model: req.model,
     instructions: toResponsesInstructions(req.messages) || 'You are an assistant running inside agent-core. Answer clearly and use provided tools by returning function calls when needed; agent-core will execute tools after policy checks and approvals.',
@@ -69,43 +62,25 @@ function buildResponsesPayload(req: LLMRequest, stream = false): Record<string, 
     tools: toResponsesTools(req.tools),
     temperature: req.temperature,
     max_output_tokens: req.max_tokens,
-    stream,
+    stream: true,
     store: false,
   };
 }
 
-function extractText(response: any): string | null {
-  if (typeof response.output_text === 'string') return response.output_text;
-  const texts: string[] = [];
-  for (const item of response.output ?? []) {
-    if (item?.type === 'message') {
-      for (const content of item.content ?? []) {
-        if (content?.type === 'output_text' && typeof content.text === 'string') texts.push(content.text);
-        if (content?.type === 'text' && typeof content.text === 'string') texts.push(content.text);
-      }
-    }
-  }
-  return texts.length ? texts.join('\n') : null;
-}
-
-function extractToolCalls(response: any): ToolCall[] {
-  const calls: ToolCall[] = [];
-  for (const item of response.output ?? []) {
-    if (item?.type !== 'function_call') continue;
-    calls.push({
-      id: String(item.call_id ?? item.id ?? `call_${calls.length}`),
-      type: 'function',
-      function: {
-        name: String(item.name ?? ''),
-        arguments: typeof item.arguments === 'string' ? item.arguments : JSON.stringify(item.arguments ?? {}),
-      },
-    });
-  }
-  return calls;
+function extractToolCallFromItem(item: any, index: number): ToolCall | undefined {
+  if (item?.type !== 'function_call') return undefined;
+  return {
+    id: String(item.call_id ?? item.id ?? `call_${index}`),
+    type: 'function',
+    function: {
+      name: String(item.name ?? ''),
+      arguments: typeof item.arguments === 'string' ? item.arguments : JSON.stringify(item.arguments ?? {}),
+    },
+  };
 }
 
 function extractUsage(response: any): Usage {
-  const usage = response.usage ?? {};
+  const usage = response?.usage ?? {};
   const promptTokens = usage.input_tokens ?? usage.prompt_tokens ?? 0;
   const completionTokens = usage.output_tokens ?? usage.completion_tokens ?? 0;
   return {
@@ -115,25 +90,63 @@ function extractUsage(response: any): Usage {
   };
 }
 
-function mapFinishReason(response: any, toolCalls: ToolCall[]): LLMResponse['finishReason'] {
-  if (toolCalls.length) return 'tool_calls';
-  if (response.status === 'incomplete') return 'length';
-  if (response.status === 'failed') return 'error';
-  return 'stop';
-}
-
 async function readErrorBody(response: Response): Promise<string> {
   const text = await response.text().catch(() => '');
   const compact = text.replace(/\s+/g, ' ').trim();
   return compact.slice(0, 500);
 }
 
+function parseSseData(block: string): any | undefined {
+  const data = block
+    .split('\n')
+    .filter((line) => line.startsWith('data:'))
+    .map((line) => line.slice('data:'.length).trimStart())
+    .join('\n')
+    .trim();
+  if (!data || data === '[DONE]') return undefined;
+  return JSON.parse(data);
+}
+
+async function* parseResponseEvents(response: Response): AsyncIterable<any> {
+  if (!response.body) return;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = '';
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    buffer += decoder.decode(value, { stream: true });
+    const blocks = buffer.split(/\r?\n\r?\n/);
+    buffer = blocks.pop() ?? '';
+    for (const block of blocks) {
+      const event = parseSseData(block);
+      if (event) yield event;
+    }
+  }
+  buffer += decoder.decode();
+  const finalEvent = parseSseData(buffer);
+  if (finalEvent) yield finalEvent;
+}
+
+function textDeltaFromEvent(event: any): string | undefined {
+  if (event?.type === 'response.output_text.delta' && typeof event.delta === 'string') return event.delta;
+  if (event?.type === 'response.output_text.done' && typeof event.text === 'string') return event.text;
+  if (event?.type === 'response.message.delta' && typeof event.delta?.content === 'string') return event.delta.content;
+  return undefined;
+}
+
+function completedResponseFromEvent(event: any): any | undefined {
+  if (event?.type === 'response.completed') return event.response;
+  if (event?.type === 'response.failed') return event.response ?? { status: 'failed' };
+  return undefined;
+}
+
 /**
  * API-style provider for the ChatGPT/Codex subscription route.
  *
- * This must use the Responses transport (`/responses`), not Chat Completions.
- * Codex CLI remains a separate harness boundary; agent-core owns tools,
- * approvals, and execution for this provider.
+ * The ChatGPT Codex backend requires Responses streaming (`stream: true`) and
+ * `store: false`. Codex CLI remains a separate harness boundary; agent-core
+ * owns tools, approvals, and execution for this provider.
  */
 export function createOpenAICodexProvider(
   name: string,
@@ -142,31 +155,44 @@ export function createOpenAICodexProvider(
   const fetchImpl = options.fetch ?? fetch;
   const baseURL = (options.baseURL ?? OPENAI_CODEX_BASE_URL).replace(/\/$/, '');
 
-  async function complete(req: LLMRequest): Promise<LLMResponse> {
+  async function request(req: LLMRequest): Promise<Response> {
     if (!options.accessToken) throw new Error('openai-codex provider needs an access token');
     const response = await fetchImpl(`${baseURL}/responses`, {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${options.accessToken}`,
         'Content-Type': 'application/json',
-        'Accept': 'application/json',
+        'Accept': 'text/event-stream',
       },
-      body: JSON.stringify(buildResponsesPayload(req, false)),
+      body: JSON.stringify(buildResponsesPayload(req)),
     });
 
     if (!response.ok) {
       const body = await readErrorBody(response);
       throw new Error(`openai-codex responses request failed: HTTP ${response.status}${body ? ` ${body}` : ''}`);
     }
+    return response;
+  }
 
-    const json = await response.json() as any;
-    const toolCalls = extractToolCalls(json);
+  async function complete(req: LLMRequest): Promise<LLMResponse> {
+    let content = '';
+    const toolCalls: ToolCall[] = [];
+    let completed: any;
+    for await (const event of parseResponseEvents(await request(req))) {
+      const delta = textDeltaFromEvent(event);
+      if (delta) content += delta;
+      if (event?.type === 'response.output_item.done') {
+        const toolCall = extractToolCallFromItem(event.item, toolCalls.length);
+        if (toolCall) toolCalls.push(toolCall);
+      }
+      completed = completedResponseFromEvent(event) ?? completed;
+    }
     return {
-      content: extractText(json),
+      content: content || null,
       toolCalls,
-      usage: extractUsage(json),
-      finishReason: mapFinishReason(json, toolCalls),
-      model: json.model ?? req.model,
+      usage: extractUsage(completed),
+      finishReason: toolCalls.length ? 'tool_calls' : completed?.status === 'incomplete' ? 'length' : completed?.status === 'failed' ? 'error' : 'stop',
+      model: completed?.model ?? req.model,
     };
   }
 
@@ -174,12 +200,25 @@ export function createOpenAICodexProvider(
     name,
     complete,
     async *stream(req: LLMRequest): AsyncIterable<StreamChunk> {
-      const response = await complete(req);
-      if (response.content) yield { type: 'text', text: response.content };
-      for (const toolCall of response.toolCalls) {
-        yield { type: 'tool_call_start', toolCall };
+      const toolCalls: ToolCall[] = [];
+      let completed: any;
+      for await (const event of parseResponseEvents(await request(req))) {
+        const delta = textDeltaFromEvent(event);
+        if (delta) yield { type: 'text', text: delta };
+        if (event?.type === 'response.output_item.done') {
+          const toolCall = extractToolCallFromItem(event.item, toolCalls.length);
+          if (toolCall) {
+            toolCalls.push(toolCall);
+            yield { type: 'tool_call_start', toolCall };
+          }
+        }
+        completed = completedResponseFromEvent(event) ?? completed;
       }
-      yield { type: 'done', finishReason: response.finishReason, usage: response.usage };
+      yield {
+        type: 'done',
+        finishReason: toolCalls.length ? 'tool_calls' : completed?.status === 'incomplete' ? 'length' : completed?.status === 'failed' ? 'error' : 'stop',
+        usage: extractUsage(completed),
+      };
     },
   };
 }
