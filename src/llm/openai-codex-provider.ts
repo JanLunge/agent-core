@@ -25,14 +25,17 @@ function toResponsesInput(messages: Message[]): unknown[] {
   for (const message of messages) {
     if (message.role === 'system') continue;
     if (message.role === 'tool') {
-      input.push({ type: 'function_call_output', call_id: message.tool_call_id, output: message.content });
+      const [callId] = (message.tool_call_id ?? '').split('|');
+      input.push({ type: 'function_call_output', call_id: callId || message.tool_call_id, output: message.content });
       continue;
     }
     if (message.role === 'assistant' && message.tool_calls?.length) {
       for (const toolCall of message.tool_calls) {
+        const [callId, itemId] = toolCall.id.split('|');
         input.push({
           type: 'function_call',
-          call_id: toolCall.id,
+          id: itemId,
+          call_id: callId,
           name: toolCall.function.name,
           arguments: toolCall.function.arguments,
         });
@@ -72,8 +75,10 @@ function buildResponsesPayload(req: LLMRequest): Record<string, unknown> {
 
 function extractToolCallFromItem(item: any, index: number): ToolCall | undefined {
   if (item?.type !== 'function_call') return undefined;
+  const callId = String(item.call_id ?? `call_${index}`);
+  const itemId = typeof item.id === 'string' && item.id ? item.id : `fc_${index}`;
   return {
-    id: String(item.call_id ?? item.id ?? `call_${index}`),
+    id: `${callId}|${itemId}`,
     type: 'function',
     function: {
       name: String(item.name ?? ''),

@@ -78,6 +78,7 @@ describe('openai-codex provider', () => {
         type: 'response.output_item.done',
         item: {
           type: 'function_call',
+          id: 'fc_1',
           call_id: 'call_1',
           name: 'exec',
           arguments: '{"command":"pwd"}',
@@ -97,7 +98,33 @@ describe('openai-codex provider', () => {
     });
 
     expect(result.finishReason).toBe('tool_calls');
-    expect(result.toolCalls).toEqual([{ id: 'call_1', type: 'function', function: { name: 'exec', arguments: '{"command":"pwd"}' } }]);
+    expect(result.toolCalls).toEqual([{ id: 'call_1|fc_1', type: 'function', function: { name: 'exec', arguments: '{"command":"pwd"}' } }]);
+  });
+
+  it('replays function calls and tool outputs using Codex call/item ids', async () => {
+    const fetchMock = vi.fn(async () => sseResponse([
+      { type: 'response.output_text.delta', delta: 'done' },
+      { type: 'response.completed', response: { model: 'gpt-5.5', status: 'completed' } },
+    ]));
+    const provider = createOpenAICodexProvider('codex-subscription', {
+      accessToken: 'test-token',
+      fetch: fetchMock as unknown as typeof fetch,
+    });
+
+    await provider.complete({
+      model: 'gpt-5.5',
+      messages: [
+        { role: 'assistant', content: '', tool_calls: [{ id: 'call_1|fc_1', type: 'function', function: { name: 'exec', arguments: '{"command":"pwd"}' } }] },
+        { role: 'tool', content: '/tmp/project', tool_call_id: 'call_1|fc_1' },
+      ],
+    });
+
+    const [, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
+    const body = JSON.parse(init.body as string);
+    expect(body.input).toEqual([
+      { type: 'function_call', id: 'fc_1', call_id: 'call_1', name: 'exec', arguments: '{"command":"pwd"}' },
+      { type: 'function_call_output', call_id: 'call_1', output: '/tmp/project' },
+    ]);
   });
 
   it('streams text chunks and done events from Codex Responses SSE', async () => {
