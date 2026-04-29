@@ -77,6 +77,10 @@ export async function runRuntimeStatus(options: RuntimeStatusOptions): Promise<R
   return summary;
 }
 
+export function renderRuntimeStatusJson(summary: RuntimeStatusSummary): string {
+  return `${JSON.stringify(summary, null, 2)}\n`;
+}
+
 export function renderRuntimeStatus(summary: RuntimeStatusSummary, options: { auditDepth?: number } = {}): string[] {
   const auditDepth = options.auditDepth ?? 5;
   return [

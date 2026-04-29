@@ -89,7 +89,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 49 Heaper migration checklist contract test references.
 - [x] Add Slice 50 notification outbox integration in runtime and continuation worker.
 - [x] Add Slice 51 audit export support for notification outbox refs.
-- [ ] Add Slice 52 runtime-status JSON output mode.
+- [x] Add Slice 52 runtime-status JSON output mode.
 - [ ] Add Slice 53 task resume command for approval-resume tasks.
 - [ ] Add Slice 54 typed link relation design note.
 - [ ] Add Slice 55 semantic time-range translation helper.
@@ -690,7 +690,7 @@ Validation:
 
 Status: implemented in `src/cli/audit-export.ts`; blocks tagged `notification-outbox` now render with the `[notification]` audit label, include status/source/delivery target/source refs in exported data, and continue to use the existing redaction path for notification message content.
 
-### Slice 52 — Runtime-status JSON output mode
+### Slice 52 — Runtime-status JSON output mode ✅
 
 Goal: add machine-readable status output for scripts/cron.
 
@@ -698,6 +698,8 @@ Validation:
 - CLI accepts `--json`;
 - output matches `RuntimeStatusSummary`;
 - text mode remains unchanged.
+
+Status: implemented with `agent-core runtime-status --store <path> --json`, which emits the full `RuntimeStatusSummary` shape for scripts/cron while preserving the existing text output path by default.
 
 ### Slice 53 — Task resume command for approval-resume tasks
 

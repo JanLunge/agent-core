@@ -9,7 +9,7 @@ import { createApprovalRequestBlock } from '../tools/approval-requests.js';
 import { createRuntimeBlockerBlock } from '../runtime/blockers.js';
 import { decideNotification } from '../notifications/policy.js';
 import { createNotificationOutboxBlock } from '../notifications/outbox.js';
-import { runRuntimeStatus } from './runtime-status.js';
+import { renderRuntimeStatusJson, runRuntimeStatus, type RuntimeStatusSummary } from './runtime-status.js';
 
 describe('runtime status command', () => {
   it('summarizes active runtime artifacts from a LocalHeaperMemory store with audit drill-down refs', async () => {
@@ -72,6 +72,10 @@ describe('runtime status command', () => {
       notifications: [{ heap: queued.heap, id: queued.id }, { heap: summarized.heap, id: summarized.id }],
     });
     expect(status.refs.dailyEntries).toContainEqual({ heap: daily.heap, id: daily.id });
+    const json = JSON.parse(renderRuntimeStatusJson(status)) as RuntimeStatusSummary;
+    expect(json).toEqual(status);
+    expect(json.counts.queuedNotifications).toBe(1);
+    expect(json.refs.notifications).toEqual([{ heap: queued.heap, id: queued.id }, { heap: summarized.heap, id: summarized.id }]);
     const text = status.lines.join('\n');
     expect(text).toContain(`Runtime status for ${storePath}`);
     expect(text).toContain('- tasks: 3 (pending=1, running=1, blocked=1)');
@@ -92,5 +96,6 @@ describe('runtime status command', () => {
     expect(status.lines).toContain('- sessions: none');
     expect(status.lines).toContain('- tasks: none');
     expect(status.lines).toContain('- blockers: none');
+    expect(renderRuntimeStatusJson(status)).toContain('"refs"');
   });
 });
