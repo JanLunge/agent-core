@@ -85,7 +85,17 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 45 durable notification outbox blocks.
 - [x] Add Slice 46 local audit compaction/snapshot command.
 - [x] Add Slice 47 runtime health/status command over local memory.
-- [ ] Add Slice 48 Heaper adapter migration checklist and contract gaps.
+- [x] Add Slice 48 Heaper adapter migration checklist and contract gaps.
+- [ ] Add Slice 49 Heaper migration checklist contract test references.
+- [ ] Add Slice 50 notification outbox integration in runtime and continuation worker.
+- [ ] Add Slice 51 audit export support for notification outbox refs.
+- [ ] Add Slice 52 runtime-status JSON output mode.
+- [ ] Add Slice 53 task resume command for approval-resume tasks.
+- [ ] Add Slice 54 typed link relation design note.
+- [ ] Add Slice 55 semantic time-range translation helper.
+- [ ] Add Slice 56 pagination-safe memory scan wrapper.
+- [ ] Add Slice 57 permission policy adapter boundary tests.
+- [ ] Add Slice 58 Heaper adapter skeleton behind feature flag.
 
 ## Active Slice Queue
 
@@ -636,7 +646,7 @@ Validation:
 
 Status: implemented in `src/cli/runtime-status.ts`; `agent-core runtime-status --store <path>` summarizes sessions, task states, active blockers, pending approvals, notification outbox items, recent daily entries, and emits `audit-export` drill-down commands for each ref.
 
-### Slice 48 — Heaper adapter migration checklist and contract gaps
+### Slice 48 — Heaper adapter migration checklist and contract gaps ✅
 
 Goal: document remaining differences between local memory scaffold and future Heaper tools before deeper integration.
 
@@ -644,6 +654,98 @@ Validation:
 - maps each memory method to intended Heaper operation;
 - lists known gaps/assumptions;
 - identifies any feedback checkpoint for Jan.
+
+Status: documented in `docs/HEAPER-MIGRATION.md`; the checklist maps every `HeaperMemory` method to the intended Heaper operation, records local scaffold assumptions/gaps, and identifies non-blocking feedback checkpoints before real adapter integration.
+
+### Slice 49 — Heaper migration checklist contract test references
+
+Goal: connect the migration checklist to executable contract tests so future adapters know exactly what to run.
+
+Validation:
+- checklist names `describeHeaperMemoryContract`;
+- docs show how a real adapter imports/runs the suite;
+- no production code changes required.
+
+### Slice 50 — Notification outbox integration in runtime and continuation worker
+
+Goal: persist runtime and worker notification intents automatically instead of only exposing outbox helpers.
+
+Validation:
+- runtime outcome can include persisted outbox ref when configured;
+- continuation worker persists notification intents before returning them;
+- silent intents become summarized outbox blocks, not queued delivery items.
+
+### Slice 51 — Audit export support for notification outbox refs
+
+Goal: make notification outbox trails easier to inspect.
+
+Validation:
+- outbox blocks receive a `[notification]` label in audit export;
+- exported data includes delivery state and source refs;
+- redaction still applies to message content.
+
+### Slice 52 — Runtime-status JSON output mode
+
+Goal: add machine-readable status output for scripts/cron.
+
+Validation:
+- CLI accepts `--json`;
+- output matches `RuntimeStatusSummary`;
+- text mode remains unchanged.
+
+### Slice 53 — Task resume command for approval-resume tasks
+
+Goal: add a local command to inspect and mark approval-resume tasks ready for continuation.
+
+Validation:
+- lists pending `approval-resume` tasks;
+- shows approval/task refs and exact operation summary;
+- does not execute unsafe work without explicit approval path.
+
+### Slice 54 — Typed link relation design note
+
+Goal: decide how untyped local links map to future typed Heaper relations.
+
+Validation:
+- documents candidate relation names;
+- maps current link use sites;
+- identifies migration-safe default for untyped legacy links.
+
+### Slice 55 — Semantic time-range translation helper
+
+Goal: implement a small helper translating labels like `today`, `yesterday`, and `last-7-days` into explicit time ranges.
+
+Validation:
+- helper is deterministic under injected clock;
+- `semanticSlice` callers can pass translated ranges;
+- local adapter still works with explicit `timeRange`.
+
+### Slice 56 — Pagination-safe memory scan wrapper
+
+Goal: avoid future production commands assuming unbounded `search('', { limit: Infinity })`.
+
+Validation:
+- wrapper expresses bounded scans with future cursor placeholder;
+- runtime-status/audit helpers can migrate to it;
+- docs mark local-only full scans clearly.
+
+### Slice 57 — Permission policy adapter boundary tests
+
+Goal: add tests proving human/persona/agent heap write policy remains above or around the memory adapter.
+
+Validation:
+- human write proposal flow remains required;
+- agent/persona writes remain allowed where expected;
+- tests document whether adapter or caller enforces policy.
+
+### Slice 58 — Heaper adapter skeleton behind feature flag
+
+Goal: add a non-functional adapter skeleton showing where real Heaper client wiring will live.
+
+Validation:
+- skeleton implements constructor/config shape but fails closed for operations;
+- runtime config can select local adapter by default;
+- docs explain what credentials/client are still missing.
 
 ## Reporting Template
 
