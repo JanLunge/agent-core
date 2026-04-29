@@ -37,12 +37,13 @@ describe('runContinuationWorker', () => {
       memory,
       taskHeaps: ['agent/tasks'],
       resultHeap: 'agent/results',
+      notificationOutboxHeap: 'agent/notifications',
       now: '2026-04-27T09:01:00.000Z',
       handleTask: () => ({ status: 'done', summary: 'slice complete', notify: true }),
     });
 
     expect(result.processed).toEqual([
-      { taskRef: { heap: 'agent/tasks', id: task.id }, status: 'done', resultRef: { heap: 'agent/results', id: 'block-2' } },
+      { taskRef: { heap: 'agent/tasks', id: task.id }, status: 'done', resultRef: { heap: 'agent/results', id: 'block-2' }, blockerRef: undefined, notificationOutboxRef: { heap: 'agent/notifications', id: 'block-3' } },
     ]);
     expect(result.notifications).toMatchObject([
       {
@@ -63,6 +64,12 @@ describe('runContinuationWorker', () => {
       tags: ['task-result', 'status:done', `task:${task.id}`],
       data: { status: 'done', summary: 'slice complete' },
       links: [{ heap: 'agent/tasks', id: task.id }],
+    });
+    await expect(memory.getBlock({ heap: 'agent/notifications', id: 'block-3' })).resolves.toMatchObject({
+      type: 'metadata',
+      tags: expect.arrayContaining(['notification-outbox', 'status:queued', 'action:notify', 'source:worker']),
+      data: { status: 'queued', source: 'worker' },
+      links: [{ heap: 'agent/tasks', id: task.id }, { heap: 'agent/results', id: 'block-2' }],
     });
   });
 
@@ -91,13 +98,19 @@ describe('runContinuationWorker', () => {
       memory,
       taskHeaps: ['agent/tasks'],
       resultHeap: 'agent/results',
+      notificationOutboxHeap: 'agent/notifications',
       handleTask: () => ({ status: 'running', summary: 'made progress', notify: true }),
     });
 
     expect(result.processed).toEqual([
-      { taskRef: { heap: 'agent/tasks', id: task.id }, status: 'running', resultRef: { heap: 'agent/results', id: 'block-2' } },
+      { taskRef: { heap: 'agent/tasks', id: task.id }, status: 'running', resultRef: { heap: 'agent/results', id: 'block-2' }, blockerRef: undefined, notificationOutboxRef: { heap: 'agent/notifications', id: 'block-3' } },
     ]);
     expect(result.notifications).toEqual([]);
+    await expect(memory.getBlock({ heap: 'agent/notifications', id: 'block-3' })).resolves.toMatchObject({
+      tags: expect.arrayContaining(['notification-outbox', 'status:summarized', 'action:silent', 'source:worker']),
+      data: { status: 'summarized', source: 'worker' },
+      links: [{ heap: 'agent/tasks', id: task.id }, { heap: 'agent/results', id: 'block-2' }],
+    });
     const updatedTask = await memory.getBlock(task);
     expect(updatedTask?.data.status).toBe('running');
     expect(updatedTask?.data.resultRefs).toEqual([{ heap: 'agent/results', id: 'block-2' }]);

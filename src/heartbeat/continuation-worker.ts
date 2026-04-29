@@ -1,5 +1,6 @@
 import { createBackgroundEvent } from '../events/index.js';
 import type { BlockRef, HeapName, HeaperBlock, HeaperMemory } from '../heaper/types.js';
+import { createNotificationOutboxBlock } from '../notifications/outbox.js';
 import { decideNotification, type NotificationIntent } from '../notifications/policy.js';
 import { createRuntimeBlockerBlock } from '../runtime/blockers.js';
 import { RuntimeBlockedError, runRuntimeEvent, type RunRuntimeEventInput } from '../runtime/orchestrator.js';
@@ -32,6 +33,7 @@ export interface RunContinuationWorkerInput {
   taskHeaps?: HeapName[];
   resultHeap: HeapName;
   blockerHeap?: HeapName;
+  notificationOutboxHeap?: HeapName;
   limit?: number;
   now?: string;
   handleTask: ContinuationTaskHandler;
@@ -43,6 +45,7 @@ export interface ContinuationWorkerResult {
     status: TaskHandlerOutcome['status'];
     resultRef: BlockRef;
     blockerRef?: BlockRef;
+    notificationOutboxRef?: BlockRef;
   }>;
   skipped: Array<{ taskRef: BlockRef; reason: string }>;
   notifications: NotificationIntent[];
@@ -112,9 +115,26 @@ export async function runContinuationWorker(input: RunContinuationWorkerInput): 
       await transitionTaskBlock({ memory: input.memory, task: running, status: 'blocked', reason: outcome.reason, now });
     }
 
-    result.processed.push({ taskRef: refFor(running), status: outcome.status, resultRef: refFor(resultBlock), blockerRef });
-
     const notification = notificationFor(outcome, refFor(running), [refFor(resultBlock), ...(blockerRef ? [blockerRef] : [])]);
+    const notificationOutbox = input.notificationOutboxHeap
+      ? await createNotificationOutboxBlock({
+        memory: input.memory,
+        heap: input.notificationOutboxHeap,
+        intent: notification,
+        source: 'worker',
+        refs: [refFor(running), refFor(resultBlock), ...(blockerRef ? [blockerRef] : [])],
+        now,
+      })
+      : undefined;
+
+    result.processed.push({
+      taskRef: refFor(running),
+      status: outcome.status,
+      resultRef: refFor(resultBlock),
+      blockerRef,
+      notificationOutboxRef: notificationOutbox ? refFor(notificationOutbox) : undefined,
+    });
+
     if (notification.action !== 'silent') result.notifications.push(notification);
   }
 
@@ -162,6 +182,7 @@ function runtimeRefs(outcome: Awaited<ReturnType<typeof runRuntimeEvent>>): Bloc
     ...outcome.guardDecisionRefs,
     ...outcome.blockerRefs,
     ...(outcome.dailyContinuityRef ? [outcome.dailyContinuityRef] : []),
+    ...(outcome.notificationOutboxRef ? [outcome.notificationOutboxRef] : []),
   ]);
 }
 

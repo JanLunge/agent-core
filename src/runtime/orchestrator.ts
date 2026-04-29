@@ -8,6 +8,7 @@ import { selectWorkingMemory, type WorkingMemoryBundle } from '../conversation/w
 import type { Message } from '../llm/types.js';
 import type { Router, RoutingDecision } from '../router/router.js';
 import { storeRouteDecision } from '../router/route-history.js';
+import { createNotificationOutboxBlock } from '../notifications/outbox.js';
 import { decideNotification, type NotificationIntent, type NotificationTrigger } from '../notifications/policy.js';
 import { createRuntimeBlockerBlock } from './blockers.js';
 import { decideGuard, type GuardDecision, type GuardRequest } from '../tools/guard.js';
@@ -31,6 +32,7 @@ export interface RunRuntimeEventInput {
   blockerHeap?: HeapName;
   personaConfigHeap?: HeapName;
   dailyHeap?: HeapName;
+  notificationOutboxHeap?: HeapName;
   modelPolicy: ModelRoutingPolicy;
   availableModels: AvailableModel[];
   complexity?: TaskComplexity;
@@ -51,6 +53,7 @@ export interface RuntimeOutcome {
   assistantMessageRef: BlockRef;
   dailyContinuityRef?: BlockRef;
   notificationIntent: NotificationIntent;
+  notificationOutboxRef?: BlockRef;
   workingMemory: WorkingMemoryBundle;
   reply: string;
   route: RoutingDecision;
@@ -64,6 +67,7 @@ export class RuntimeBlockedError extends Error {
     readonly blockerRef: BlockRef,
     readonly notificationIntent: NotificationIntent,
     readonly cause?: unknown,
+    readonly notificationOutboxRef?: BlockRef,
   ) {
     super(message);
     this.name = 'RuntimeBlockedError';
@@ -102,7 +106,18 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
       operation: `load persona config for ${personaName}`,
       originRefs: [refFor(eventBlock)],
     });
-    throw runtimeBlocked(input.event, blocker, [refFor(eventBlock), refFor(blocker)], err, 'blocked');
+    const blocked = runtimeBlocked(input.event, blocker, [refFor(eventBlock), refFor(blocker)], err, 'blocked');
+    const notificationOutbox = input.notificationOutboxHeap
+      ? await createNotificationOutboxBlock({
+        memory: input.memory,
+        heap: input.notificationOutboxHeap,
+        intent: blocked.notificationIntent,
+        source: 'runtime',
+        deliveryTarget: input.event.conversationKey,
+        refs: [refFor(blocker)],
+      })
+      : undefined;
+    throw new RuntimeBlockedError(blocked.message, blocked.blockerRef, blocked.notificationIntent, blocked.cause, notificationOutbox ? refFor(notificationOutbox) : undefined);
   }
   const activeSessionHeap = personaConfig?.defaultHeaps.sessions ?? input.sessionHeap;
   const sessionStore = new HeaperSessionStore({ memory: input.memory, sessionHeap: activeSessionHeap });
@@ -166,7 +181,18 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
       sessionRef: refFor(sessionBlock),
       originRefs: [refFor(eventBlock), refFor(routeBlock)],
     });
-    throw runtimeBlocked(input.event, blocker, [refFor(eventBlock), refFor(routeBlock), refFor(blocker)], err, 'blocked');
+    const blocked = runtimeBlocked(input.event, blocker, [refFor(eventBlock), refFor(routeBlock), refFor(blocker)], err, 'blocked');
+    const notificationOutbox = input.notificationOutboxHeap
+      ? await createNotificationOutboxBlock({
+        memory: input.memory,
+        heap: input.notificationOutboxHeap,
+        intent: blocked.notificationIntent,
+        source: 'runtime',
+        deliveryTarget: input.event.conversationKey ?? route.channelId,
+        refs: [refFor(blocker)],
+      })
+      : undefined;
+    throw new RuntimeBlockedError(blocked.message, blocked.blockerRef, blocked.notificationIntent, blocked.cause, notificationOutbox ? refFor(notificationOutbox) : undefined);
   }
 
   const modelBlock = await input.memory.createBlock({
@@ -222,13 +248,24 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
       sessionRef: refFor(sessionBlock),
       originRefs: [refFor(eventBlock), refFor(routeBlock), refFor(modelBlock), refFor(userMessage), ...guardBlocks.map(refFor), ...blockerBlocks.map(refFor)],
     });
-    throw runtimeBlocked(
+    const blocked = runtimeBlocked(
       input.event,
       blocker,
       [refFor(eventBlock), refFor(routeBlock), refFor(modelBlock), refFor(userMessage), refFor(blocker)],
       err,
       'failed',
     );
+    const notificationOutbox = input.notificationOutboxHeap
+      ? await createNotificationOutboxBlock({
+        memory: input.memory,
+        heap: input.notificationOutboxHeap,
+        intent: blocked.notificationIntent,
+        source: 'runtime',
+        deliveryTarget: input.event.conversationKey ?? route.channelId,
+        refs: [refFor(blocker)],
+      })
+      : undefined;
+    throw new RuntimeBlockedError(blocked.message, blocked.blockerRef, blocked.notificationIntent, blocked.cause, notificationOutbox ? refFor(notificationOutbox) : undefined);
   }
 
   const assistantMessage = await sessionStore.appendMessage(
@@ -269,6 +306,16 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     ],
   });
 
+  const notificationOutbox = input.notificationOutboxHeap
+    ? await createNotificationOutboxBlock({
+      memory: input.memory,
+      heap: input.notificationOutboxHeap,
+      intent: notificationIntent,
+      source: 'runtime',
+      deliveryTarget: input.event.conversationKey ?? route.channelId,
+    })
+    : undefined;
+
   return {
     eventRef: refFor(eventBlock),
     routeRef: refFor(routeBlock),
@@ -281,6 +328,7 @@ export async function runRuntimeEvent(input: RunRuntimeEventInput): Promise<Runt
     assistantMessageRef: refFor(assistantMessage),
     dailyContinuityRef: dailyContinuity ? refFor(dailyContinuity) : undefined,
     notificationIntent,
+    notificationOutboxRef: notificationOutbox ? refFor(notificationOutbox) : undefined,
     workingMemory,
     reply,
     route,

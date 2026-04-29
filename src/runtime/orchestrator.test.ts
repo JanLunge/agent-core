@@ -364,6 +364,38 @@ describe('runRuntimeEvent', () => {
     });
   });
 
+  it('persists runtime notification intents to an outbox when configured', async () => {
+    const memory = new InMemoryHeaperMemory({ idPrefix: 'block', now: () => '2026-04-28T15:00:00.000Z' });
+    const router = createRouter();
+    router.registerAgent('mira', fakeAgent('mira'));
+
+    const outcome = await runRuntimeEvent({
+      event: createChatEvent({ id: 'evt-outbox', channelType: 'telegram', chatId: 'jan', text: '@mira persist notification' }),
+      router,
+      memory,
+      sessionHeap: 'agent/sessions',
+      auditHeap: 'agent/audit',
+      notificationOutboxHeap: 'agent/notifications',
+      modelPolicy,
+      availableModels,
+      responder: () => 'notification persisted',
+    });
+
+    expect(outcome.notificationOutboxRef).toEqual({ heap: 'agent/notifications', id: 'block-7' });
+    await expect(memory.getBlock(outcome.notificationOutboxRef!)).resolves.toMatchObject({
+      heap: 'agent/notifications',
+      type: 'metadata',
+      tags: expect.arrayContaining(['notification-outbox', 'status:queued', 'action:direct-response', 'source:runtime']),
+      data: {
+        status: 'queued',
+        intent: outcome.notificationIntent,
+        source: 'runtime',
+        deliveryTarget: 'telegram:jan',
+      },
+      links: [outcome.eventRef, outcome.routeRef, outcome.modelDecisionRef, outcome.userMessageRef, outcome.assistantMessageRef],
+    });
+  });
+
   it('requests notification when background runtime guard decisions require approval', async () => {
     const memory = new InMemoryHeaperMemory({ idPrefix: 'block' });
     const router = createRouter();

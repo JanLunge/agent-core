@@ -87,7 +87,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 47 runtime health/status command over local memory.
 - [x] Add Slice 48 Heaper adapter migration checklist and contract gaps.
 - [x] Add Slice 49 Heaper migration checklist contract test references.
-- [ ] Add Slice 50 notification outbox integration in runtime and continuation worker.
+- [x] Add Slice 50 notification outbox integration in runtime and continuation worker.
 - [ ] Add Slice 51 audit export support for notification outbox refs.
 - [ ] Add Slice 52 runtime-status JSON output mode.
 - [ ] Add Slice 53 task resume command for approval-resume tasks.
@@ -668,7 +668,7 @@ Validation:
 
 Status: documented in `docs/HEAPER-MIGRATION.md`; future adapters can import `describeHeaperMemoryContract` from `src/heaper/adapter-contract.test.ts`, run it with `pnpm test -- src/heaper/adapter-contract.test.ts`, and add adapter-specific auth/permission/retry/conflict tests around it.
 
-### Slice 50 — Notification outbox integration in runtime and continuation worker
+### Slice 50 — Notification outbox integration in runtime and continuation worker ✅
 
 Goal: persist runtime and worker notification intents automatically instead of only exposing outbox helpers.
 
@@ -676,6 +676,8 @@ Validation:
 - runtime outcome can include persisted outbox ref when configured;
 - continuation worker persists notification intents before returning them;
 - silent intents become summarized outbox blocks, not queued delivery items.
+
+Status: implemented with optional `notificationOutboxHeap` on runtime and continuation worker inputs. Runtime outcomes now expose `notificationOutboxRef` when configured; runtime blocked errors can carry a persisted outbox ref; continuation worker processed entries expose `notificationOutboxRef`; worker silent progress is persisted as summarized outbox blocks while non-silent intents are still returned for delivery.
 
 ### Slice 51 — Audit export support for notification outbox refs
 
