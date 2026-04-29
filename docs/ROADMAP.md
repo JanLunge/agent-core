@@ -94,7 +94,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 54 typed link relation design note.
 - [x] Add Slice 55 semantic time-range translation helper.
 - [x] Add Slice 56 pagination-safe memory scan wrapper.
-- [ ] Add Slice 57 permission policy adapter boundary tests.
+- [x] Add Slice 57 permission policy adapter boundary tests.
 - [ ] Add Slice 58 Heaper adapter skeleton behind feature flag.
 
 ## Active Slice Queue
@@ -745,7 +745,7 @@ Validation:
 
 Status: implemented in `src/heaper/scan.ts`; broad command scans now use `scanMemory`, which applies a bounded default limit, rejects unbounded/invalid limits, and returns `cursor-unavailable` when the limit is hit. Runtime-status and task-resume now use it; audit export remains ref-traversal based rather than whole-store scanning.
 
-### Slice 57 — Permission policy adapter boundary tests
+### Slice 57 — Permission policy adapter boundary tests ✅
 
 Goal: add tests proving human/persona/agent heap write policy remains above or around the memory adapter.
 
@@ -753,6 +753,8 @@ Validation:
 - human write proposal flow remains required;
 - agent/persona writes remain allowed where expected;
 - tests document whether adapter or caller enforces policy.
+
+Status: implemented in `src/heaper/permission-boundary.test.ts`; tests document that local memory adapters are storage-only, human heap protection is enforced by the policy/proposal layer above the adapter, and agent/persona heaps remain writable where policy allows.
 
 ### Slice 58 — Heaper adapter skeleton behind feature flag
 
