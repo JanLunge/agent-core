@@ -86,7 +86,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 46 local audit compaction/snapshot command.
 - [x] Add Slice 47 runtime health/status command over local memory.
 - [x] Add Slice 48 Heaper adapter migration checklist and contract gaps.
-- [ ] Add Slice 49 Heaper migration checklist contract test references.
+- [x] Add Slice 49 Heaper migration checklist contract test references.
 - [ ] Add Slice 50 notification outbox integration in runtime and continuation worker.
 - [ ] Add Slice 51 audit export support for notification outbox refs.
 - [ ] Add Slice 52 runtime-status JSON output mode.
@@ -657,7 +657,7 @@ Validation:
 
 Status: documented in `docs/HEAPER-MIGRATION.md`; the checklist maps every `HeaperMemory` method to the intended Heaper operation, records local scaffold assumptions/gaps, and identifies non-blocking feedback checkpoints before real adapter integration.
 
-### Slice 49 — Heaper migration checklist contract test references
+### Slice 49 — Heaper migration checklist contract test references ✅
 
 Goal: connect the migration checklist to executable contract tests so future adapters know exactly what to run.
 
@@ -665,6 +665,8 @@ Validation:
 - checklist names `describeHeaperMemoryContract`;
 - docs show how a real adapter imports/runs the suite;
 - no production code changes required.
+
+Status: documented in `docs/HEAPER-MIGRATION.md`; future adapters can import `describeHeaperMemoryContract` from `src/heaper/adapter-contract.test.ts`, run it with `pnpm test -- src/heaper/adapter-contract.test.ts`, and add adapter-specific auth/permission/retry/conflict tests around it.
 
 ### Slice 50 — Notification outbox integration in runtime and continuation worker
 

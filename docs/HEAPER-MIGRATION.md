@@ -50,11 +50,48 @@ Ask Jan before changing any of these product-level semantics:
 3. Whether daily entries should be first-class Heaper daily blocks or ordinary blocks with date metadata.
 4. Whether audit snapshots should become durable summary blocks in `agent/*` by default once Heaper is live.
 
+
+## Executable contract suite
+
+Every memory adapter must run the shared conformance suite before it is used by runtime code. The suite lives in `src/heaper/adapter-contract.test.ts` and exports `describeHeaperMemoryContract(adapter)`. It currently validates the local in-memory and JSON-file adapters, and future real-Heaper adapters should import the same helper instead of copying assertions.
+
+Minimal adapter test pattern:
+
+```ts
+import { describeHeaperMemoryContract } from './adapter-contract.test.js';
+import { HeaperClientMemory } from './heaper-client-memory.js';
+
+describeHeaperMemoryContract({
+  name: 'HeaperClientMemory',
+  create: () => new HeaperClientMemory({
+    // test endpoint/client/credentials go here
+  }),
+  reopen: (memory) => memory,
+});
+```
+
+Use `reopen` only when the adapter has restart/persistence semantics that can be exercised in the test environment. Networked Heaper adapters should add separate adapter-specific tests for authentication failures, permission denials, retryable transport errors, and conflict/revision behavior.
+
+Run target:
+
+```sh
+pnpm test -- src/heaper/adapter-contract.test.ts
+```
+
+The contract intentionally checks behavior that runtime code depends on:
+
+- create/get/update preserve heap, type, data, tags, metadata, timestamps, and defensive clone semantics;
+- search honors query, heap, tag, type, time, and limit filters;
+- links are deduplicated and currently traversable in both directions through `getRelatedBlocks`;
+- daily entries append to one block per date/heap and semantic slices preserve filter behavior;
+- human/agent/persona heap names and permission-facing tags are not coerced;
+- optional `reopen` verifies blocks, links, and daily entries survive adapter restart.
+
 ## Migration checklist
 
 - [ ] Add a real Heaper adapter implementing `HeaperMemory` without changing runtime callers.
-- [ ] Run `describeHeaperMemoryContract` against the adapter.
-- [ ] Add adapter-specific tests for auth/permission failures and retryable network/storage failures.
+- [ ] Run `describeHeaperMemoryContract` from `src/heaper/adapter-contract.test.ts` against the adapter.
+- [ ] Add adapter-specific tests for auth/permission failures, retryable network/storage failures, and conflict/revision behavior.
 - [ ] Decide and document link directionality/typing before relying on richer graph traversal.
 - [ ] Implement semantic time-range translation for `semanticSlice`.
 - [ ] Add pagination/cursor support or a bounded iteration wrapper before using production-sized stores.

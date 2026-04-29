@@ -109,8 +109,8 @@ describe('end-to-end runtime smoke scenario', () => {
 
     expect(report.text).toContain('Latest commit: smoke123 Runtime smoke');
     expect(report.text).toContain('Tests: passed (pnpm test -- src/runtime/e2e-smoke.test.ts — smoke scenario)');
-    expect(report.text).toContain('Completed slice: Slice 48 — Heaper adapter migration checklist and contract gaps');
-    expect(report.text).toContain('Active slice: Slice 49 — Heaper migration checklist contract test references');
+    expect(report.text).toContain('Completed slice: Slice 49 — Heaper migration checklist contract test references');
+    expect(report.text).toContain('Active slice: Slice 50 — Notification outbox integration in runtime and continuation worker');
   });
 
   it('runs a sensitive variant with local model routing and denied external tool intent', async () => {
