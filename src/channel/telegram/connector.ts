@@ -236,19 +236,13 @@ export class TelegramConnector {
   }
 
   // ---------------------------------------------------------------------------
-  // Message handling with streaming edits
+  // Message handling with typing indicator
   // ---------------------------------------------------------------------------
 
   private async handleMessage(
     ctx: Context,
     message: IncomingMessage,
   ): Promise<void> {
-    // Send a placeholder while the LLM processes
-    const placeholder = await ctx.reply('…');
-
-    let accumulated = '';
-    let lastEditedText = '';
-    let editTimer: ReturnType<typeof setInterval> | undefined;
     let typingTimer: ReturnType<typeof setInterval> | undefined;
 
     const chatId = ctx.chat?.id;
@@ -257,34 +251,14 @@ export class TelegramConnector {
       await ctx.api.sendChatAction(chatId, 'typing').catch(() => {});
     };
 
-    const flushEdit = async () => {
-      const snapshot = accumulated;
-      if (snapshot && snapshot !== lastEditedText) {
-        try {
-          await ctx.api.editMessageText(
-            placeholder.chat.id,
-            placeholder.message_id,
-            escapeMarkdownV2(snapshot),
-            { parse_mode: 'MarkdownV2' },
-          );
-          lastEditedText = snapshot;
-        } catch {
-          // Edit may fail if content is unchanged or too fast — ignore
-        }
-      }
+    const onStream = (_chunk: StreamChunk) => {
+      // Telegram's native typing indicator is enough while the agent is
+      // working. Avoid placeholder/stream-edit messages like "…" so chats stay
+      // clean and the final answer arrives as a normal message.
     };
 
-    const onStream = (chunk: StreamChunk) => {
-      if (chunk.type === 'text' && chunk.text) {
-        accumulated += chunk.text;
-      }
-    };
-
-    // Start timers to periodically edit streamed text and keep Telegram's
-    // native "typing…" indicator alive while the agent is working.
     await sendTyping();
     typingTimer = setInterval(() => { void sendTyping(); }, 4_000);
-    editTimer = setInterval(flushEdit, 500);
 
     const onApproval = (request: ApprovalRequest): Promise<ApprovalResult> => this.requestToolCallApproval(ctx, request);
 
@@ -292,8 +266,6 @@ export class TelegramConnector {
       const result = await this.router.route(message, onStream, onApproval);
 
       // Stop progress indicators before sending the final response.
-      clearInterval(editTimer);
-      editTimer = undefined;
       if (typingTimer) {
         clearInterval(typingTimer);
         typingTimer = undefined;
@@ -306,36 +278,15 @@ export class TelegramConnector {
         console.log(`[telegram] remembered blocked Desktop target for retry: ${blockedDesktopTarget}`);
       }
 
-      // Replace the placeholder with the final response
       const chunks = splitMessage(finalText);
-
-      // Edit the placeholder with the first chunk
-      try {
-        await ctx.api.editMessageText(
-          placeholder.chat.id,
-          placeholder.message_id,
-          escapeMarkdownV2(chunks[0]!),
-          { parse_mode: 'MarkdownV2' },
-        );
-      } catch {
-        // If edit fails (e.g. identical content), try plain text
-        await ctx.api
-          .editMessageText(
-            placeholder.chat.id,
-            placeholder.message_id,
-            chunks[0]!,
-          )
-          .catch(() => {});
-      }
-
-      // Send remaining chunks as new messages
-      for (let i = 1; i < chunks.length; i++) {
-        await ctx.reply(escapeMarkdownV2(chunks[i]!), {
-          parse_mode: 'MarkdownV2',
-        });
+      for (const chunk of chunks) {
+        try {
+          await ctx.reply(escapeMarkdownV2(chunk), { parse_mode: 'MarkdownV2' });
+        } catch {
+          await ctx.reply(chunk).catch(() => {});
+        }
       }
     } finally {
-      if (editTimer) clearInterval(editTimer);
       if (typingTimer) clearInterval(typingTimer);
     }
   }
