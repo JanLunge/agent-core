@@ -39,7 +39,10 @@ function toResponsesInput(messages: Message[]): unknown[] {
       }
       if (!message.content) continue;
     }
-    input.push({ role: message.role, content: message.content });
+    input.push({
+      role: message.role,
+      content: [{ type: message.role === 'assistant' ? 'output_text' : 'input_text', text: message.content }],
+    });
   }
   return input;
 }
@@ -130,9 +133,17 @@ async function* parseResponseEvents(response: Response): AsyncIterable<any> {
 
 function textDeltaFromEvent(event: any): string | undefined {
   if (event?.type === 'response.output_text.delta' && typeof event.delta === 'string') return event.delta;
-  if (event?.type === 'response.output_text.done' && typeof event.text === 'string') return event.text;
   if (event?.type === 'response.message.delta' && typeof event.delta?.content === 'string') return event.delta.content;
   return undefined;
+}
+
+function textDoneFromItem(item: any): string | undefined {
+  if (item?.type !== 'message') return undefined;
+  const content = Array.isArray(item.content) ? item.content : [];
+  const text = content
+    .map((part: any) => part?.type === 'output_text' ? part.text ?? '' : part?.refusal ?? '')
+    .join('');
+  return text || undefined;
 }
 
 function completedResponseFromEvent(event: any): any | undefined {
@@ -182,6 +193,8 @@ export function createOpenAICodexProvider(
       const delta = textDeltaFromEvent(event);
       if (delta) content += delta;
       if (event?.type === 'response.output_item.done') {
+        const finalText = textDoneFromItem(event.item);
+        if (finalText !== undefined) content = finalText;
         const toolCall = extractToolCallFromItem(event.item, toolCalls.length);
         if (toolCall) toolCalls.push(toolCall);
       }
@@ -202,10 +215,16 @@ export function createOpenAICodexProvider(
     async *stream(req: LLMRequest): AsyncIterable<StreamChunk> {
       const toolCalls: ToolCall[] = [];
       let completed: any;
+      let streamedText = '';
       for await (const event of parseResponseEvents(await request(req))) {
         const delta = textDeltaFromEvent(event);
-        if (delta) yield { type: 'text', text: delta };
+        if (delta) {
+          streamedText += delta;
+          yield { type: 'text', text: delta };
+        }
         if (event?.type === 'response.output_item.done') {
+          const finalText = textDoneFromItem(event.item);
+          if (finalText !== undefined && !streamedText) yield { type: 'text', text: finalText };
           const toolCall = extractToolCallFromItem(event.item, toolCalls.length);
           if (toolCall) {
             toolCalls.push(toolCall);

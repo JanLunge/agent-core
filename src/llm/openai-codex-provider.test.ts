@@ -42,7 +42,7 @@ describe('openai-codex provider', () => {
     expect(body).toMatchObject({
       model: 'gpt-5.5',
       instructions: expect.any(String),
-      input: [{ role: 'user', content: 'ping' }],
+      input: [{ role: 'user', content: [{ type: 'input_text', text: 'ping' }] }],
       stream: true,
       store: false,
     });
@@ -69,7 +69,7 @@ describe('openai-codex provider', () => {
     const [, init] = fetchMock.mock.calls[0]! as unknown as [string, RequestInit];
     const body = JSON.parse(init.body as string);
     expect(body.instructions).toBe('Be concise.');
-    expect(body.input).toEqual([{ role: 'user', content: 'ping' }]);
+    expect(body.input).toEqual([{ role: 'user', content: [{ type: 'input_text', text: 'ping' }] }]);
   });
 
   it('returns function calls from streamed Responses output for the agent-core harness', async () => {
