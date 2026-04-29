@@ -46,10 +46,12 @@ export interface SearchFilters {
   limit?: number;
 }
 
+export type SemanticTimeRangeLabel = 'today' | 'yesterday' | 'last-7-days' | string;
+
 export interface SemanticSliceOptions extends SearchFilters {
   query: string;
   /** Optional human-friendly range such as "today", "yesterday", or "last-7-days". */
-  timeRangeLabel?: string;
+  timeRangeLabel?: SemanticTimeRangeLabel;
 }
 
 export interface CreateBlockInput<TData extends Record<string, unknown> = Record<string, unknown>> {

@@ -10,6 +10,7 @@ import type {
   SemanticSliceOptions,
   UpdateBlockInput,
 } from './types.js';
+import { semanticSliceFiltersWithTimeRange } from './time-range.js';
 
 export interface LocalHeaperMemoryOptions {
   filePath: string;
@@ -135,8 +136,8 @@ export class LocalHeaperMemory implements HeaperMemory {
   }
 
   async semanticSlice(options: SemanticSliceOptions): Promise<HeaperBlock[]> {
-    const { query, timeRangeLabel: _timeRangeLabel, ...filters } = options;
-    return this.search(query, filters);
+    const { query, ...filterOptions } = options;
+    return this.search(query, semanticSliceFiltersWithTimeRange(filterOptions, this.now()));
   }
 
   private async load(): Promise<void> {

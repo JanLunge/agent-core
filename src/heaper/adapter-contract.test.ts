@@ -91,6 +91,8 @@ export function describeHeaperMemoryContract(adapter: HeaperMemoryContractAdapte
       expect(second.data).toEqual({ date: '2026-04-28', content: 'Started router work\nKept note file quiet' });
       expect((await memory.getDailyEntry('2026-04-28', 'persona/mira/daily'))?.id).toBe(first.id);
       await expect(memory.semanticSlice({ query: 'tool', tags: ['tools'] })).resolves.toHaveLength(1);
+      await expect(memory.semanticSlice({ query: 'tool', tags: ['tools'], timeRangeLabel: 'today' })).resolves.toHaveLength(1);
+      await expect(memory.semanticSlice({ query: 'tool', tags: ['tools'], timeRangeLabel: 'yesterday' })).resolves.toHaveLength(0);
     });
 
     it('preserves permission-facing heap scopes and tags without coercion', async () => {

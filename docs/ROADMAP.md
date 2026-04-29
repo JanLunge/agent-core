@@ -92,7 +92,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 52 runtime-status JSON output mode.
 - [x] Add Slice 53 task resume command for approval-resume tasks.
 - [x] Add Slice 54 typed link relation design note.
-- [ ] Add Slice 55 semantic time-range translation helper.
+- [x] Add Slice 55 semantic time-range translation helper.
 - [ ] Add Slice 56 pagination-safe memory scan wrapper.
 - [ ] Add Slice 57 permission policy adapter boundary tests.
 - [ ] Add Slice 58 Heaper adapter skeleton behind feature flag.
@@ -723,7 +723,7 @@ Validation:
 
 Status: documented in `docs/LINK-RELATIONS.md`; the design keeps `links?: BlockRef[]` as the compatibility field, imports legacy links as `related`, proposes typed relation names, maps current runtime/task/approval/tool/delegation/audit use sites, and outlines a migration plan that preserves existing traversal behavior.
 
-### Slice 55 — Semantic time-range translation helper
+### Slice 55 — Semantic time-range translation helper ✅
 
 Goal: implement a small helper translating labels like `today`, `yesterday`, and `last-7-days` into explicit time ranges.
 
@@ -731,6 +731,8 @@ Validation:
 - helper is deterministic under injected clock;
 - `semanticSlice` callers can pass translated ranges;
 - local adapter still works with explicit `timeRange`.
+
+Status: implemented in `src/heaper/time-range.ts`; `today`, `yesterday`, and `last-7-days` translate to explicit UTC ranges under an injected clock, explicit `timeRange` wins over labels, and both local memory adapters now apply translated filters in `semanticSlice`.
 
 ### Slice 56 — Pagination-safe memory scan wrapper
 
