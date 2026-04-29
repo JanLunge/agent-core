@@ -29,6 +29,23 @@ describe('direct Telegram operation intents', () => {
     });
   });
 
+  it('detects rm-style Desktop path deletion before Codex can try a read-only shell command', () => {
+    const path = join(homedir(), 'Desktop', 'a.md');
+    expect(parseDirectFileDeleteIntent(`rm ${path}`)).toMatchObject({
+      kind: 'file.delete',
+      target: path,
+      args: { path, recoverable: true },
+      description: 'Move a.md from the Desktop to Trash',
+    });
+  });
+
+  it('detects tilde Desktop path deletion', () => {
+    expect(parseDirectFileDeleteIntent('please trash ~/Desktop/a.md')).toMatchObject({
+      kind: 'file.delete',
+      target: join(homedir(), 'Desktop', 'a.md'),
+    });
+  });
+
   it('prefers delete intent over write intent for remove requests', () => {
     expect(parseDirectOperationIntent('remove the test-note.md from the desktop')).toMatchObject({ kind: 'file.delete' });
   });

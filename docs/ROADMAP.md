@@ -146,6 +146,8 @@ Validation:
 
 Status: completed with `runtime-dogfood`, `src/cli/runtime-dogfood.ts`, and `src/runtime/provider-responder.ts`. The command runs a Telegram-replay-shaped turn through `runRuntimeEvent`, durable LocalHeaperMemory, model routing, session/daily memory, and a provider-backed responder seam. Missing configured credentials return an explicit blocker instead of fake output.
 
+End-user acceptance follow-up: after Jan hit `rm /Users/ulflunge/Desktop/a.md` falling through to Codex read-only, the normal Telegram direct-approval bridge now recognizes `rm` plus absolute/tilde Desktop paths and intercepts them before the Codex CLI path can attempt a read-only shell command. This is still a bridge, not the final runtime unification; the remaining product task is to route normal Telegram through the beta runtime/tool approval path.
+
 ### Beta Slice 2 — Replace fake agent on dogfood path
 
 Goal: ensure the dogfood path invokes a real agent/provider boundary rather than `FakeAgent` or deterministic text responses.

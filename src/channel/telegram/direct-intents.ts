@@ -49,19 +49,22 @@ export function parseDirectFileDeleteIntent(
   text: string,
   options: DirectOperationIntentOptions = {},
 ): OperationIntent | undefined {
-  const lower = text.trim().toLowerCase();
-  if (!/\b(remove|delete|trash)\b/.test(lower)) return undefined;
+  const normalized = text.trim();
+  const lower = normalized.toLowerCase();
+  if (!/\b(remove|delete|trash|rm)\b/.test(lower)) return undefined;
 
   const explicitDesktop = /\bdesktop\b/.test(lower);
-  const fileName = extractFileName(lower);
+  const explicitPath = extractDesktopPath(normalized);
+  const fileName = explicitPath ? undefined : extractFileName(lower);
   const contextualDelete = /\b(it|that|this|again)\b/.test(lower);
-  const path = fileName
-    // For this early bridge, bare filenames are scoped to Desktop because the
-    // Telegram test flow creates and removes Desktop notes. Avoid arbitrary paths.
-    ? join(homedir(), 'Desktop', fileName)
-    : contextualDelete
-      ? options.lastFileTarget
-      : undefined;
+  const path = explicitPath
+    ?? (fileName
+      // For this early bridge, bare filenames are scoped to Desktop because the
+      // Telegram test flow creates and removes Desktop notes. Avoid arbitrary paths.
+      ? join(homedir(), 'Desktop', fileName)
+      : contextualDelete
+        ? options.lastFileTarget
+        : undefined);
   if (!path) return undefined;
 
   const location = explicitDesktop || path.startsWith(join(homedir(), 'Desktop')) ? 'from the Desktop' : 'from its current location';
@@ -75,11 +78,26 @@ export function parseDirectFileDeleteIntent(
   };
 }
 
+function extractDesktopPath(text: string): string | undefined {
+  const desktop = join(homedir(), 'Desktop');
+  const escapedDesktop = desktop.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const absolute = text.match(new RegExp(`${escapedDesktop}/([^\\s"']+\\.(?:md|txt))`, 'i'))?.[0];
+  if (absolute) return join(desktop, sanitizeFileName(basename(absolute)));
+
+  const tilde = text.match(/~\/Desktop\/([^\s"']+\.(?:md|txt))/i)?.[1];
+  if (tilde) return join(desktop, sanitizeFileName(tilde));
+
+  const relative = text.match(/\bDesktop\/([^\s"']+\.(?:md|txt))/i)?.[1];
+  if (relative) return join(desktop, sanitizeFileName(relative));
+
+  return undefined;
+}
+
 function extractFileName(lower: string): string | undefined {
   const explicit = lower.match(/\b([a-z0-9][a-z0-9_-]*\.(?:md|txt))\b/i)?.[1];
   if (explicit) return sanitizeFileName(explicit);
 
-  const named = lower.match(/\b(?:remove|delete|trash)\s+(?:the\s+)?([a-z0-9][a-z0-9_-]*)\b/i)?.[1];
+  const named = lower.match(/\b(?:remove|delete|trash|rm)\s+(?:the\s+)?([a-z0-9][a-z0-9_-]*)\b/i)?.[1];
   if (!named || ['note', 'file', 'it', 'that', 'this', 'again'].includes(named)) return undefined;
   return sanitizeFileName(`${named}.md`);
 }
