@@ -4,6 +4,7 @@ import type { SecretResolver } from '../secrets/resolver.js';
 import { createOpenAIProvider } from './openai-provider.js';
 import { createOpenAICodexProvider } from './openai-codex-provider.js';
 import { createCodexCliProvider } from './codex-cli-provider.js';
+import { resolveOpenClawAuthToken } from './openclaw-auth.js';
 
 const providers = new Map<string, LLMProvider>();
 
@@ -16,7 +17,15 @@ export function resolveApiKey(profile: ProviderProfile, resolver?: SecretResolve
     if (fromVault) return fromVault;
   }
   // Fall back to env var
-  if (profile.api_key_env) return process.env[profile.api_key_env];
+  if (profile.api_key_env && process.env[profile.api_key_env]) return process.env[profile.api_key_env];
+  // Temporary compatibility bridge: reuse OpenClaw's provider auth profile at runtime
+  // without copying token material into agent-core config or vault.
+  if (profile.type === 'openai-codex') {
+    return resolveOpenClawAuthToken({
+      provider: 'openai-codex',
+      profileId: profile.openclaw_auth_profile,
+    });
+  }
   return undefined;
 }
 

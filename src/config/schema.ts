@@ -8,6 +8,8 @@ export const ProviderProfileSchema = z.object({
   base_url: z.string().optional(),
   api_key_env: z.string().optional(),
   api_key: z.string().optional(),
+  /** Optional OpenClaw auth profile id, e.g. openai-codex:default. Read at runtime, never copied into agent-core config. */
+  openclaw_auth_profile: z.string().optional(),
   default_model: z.string().optional(),
   command: z.string().optional(),
   cwd: z.string().optional(),

@@ -15,6 +15,8 @@ providers:
   - name: codex-api
     type: openai-codex
     api_key_env: OPENAI_CODEX_ACCESS_TOKEN
+    # Optional: pin an OpenClaw auth profile. Omit to use the best unexpired openai-codex profile.
+    # openclaw_auth_profile: openai-codex:default
     default_model: gpt-5.5
   - name: codex-cli-harness
     type: codex-cli
@@ -26,7 +28,9 @@ default_model: gpt-5.5
 
 `roles/companion.yaml` defaults Mira to `gpt-5.5`.
 
-If `OPENAI_CODEX_ACCESS_TOKEN` is missing, startup fails loudly rather than falling back to Codex CLI.
+Credential resolution order is: agent-core vault/env `OPENAI_CODEX_ACCESS_TOKEN`, then the OpenClaw auth profile named by `openclaw_auth_profile` or the best unexpired `openai-codex` profile when no profile is pinned. The OpenClaw token is read at runtime and is not copied into agent-core config or vault.
+
+If neither credential source is available, startup fails loudly rather than falling back to Codex CLI.
 
 ## Verify
 

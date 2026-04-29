@@ -15,6 +15,8 @@ prompt:
 #   - name: codex-api
 #     type: openai-codex
 #     api_key_env: OPENAI_CODEX_ACCESS_TOKEN
+#     # Optional: pin an OpenClaw auth profile. Omit to use the best unexpired openai-codex profile.
+#     # openclaw_auth_profile: openai-codex:default
 #     default_model: gpt-5.5
 #   - name: codex-cli-harness
 #     type: codex-cli
