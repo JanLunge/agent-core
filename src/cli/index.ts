@@ -31,6 +31,7 @@ import { runRuntimeSmoke } from './runtime-smoke.js';
 import { startRuntimeTelegramSpike } from './runtime-telegram-spike.js';
 import { runAuditExport, runAuditSnapshot } from './audit-export.js';
 import { renderTelegramAuditFixture, runTelegramAuditFixture } from './audit-export-fixture.js';
+import { runRuntimeStatus } from './runtime-status.js';
 
 const program = new Command();
 
@@ -277,6 +278,23 @@ program
       console.log(result.lines.join('\n'));
     } catch (err) {
       console.error('Runtime smoke failed:', err instanceof Error ? err.message : err);
+      process.exit(1);
+    }
+  });
+
+program
+  .command('runtime-status')
+  .description('Summarize sessions, tasks, blockers, approvals, notifications, and daily continuity from a LocalHeaperMemory store')
+  .requiredOption('-s, --store <path>', 'Local HeaperMemory JSON store path')
+  .option('-d, --depth <n>', 'Audit-export depth for drill-down commands', '5')
+  .action(async (opts: { store: string; depth: string }) => {
+    try {
+      const auditDepth = Number.parseInt(opts.depth, 10);
+      if (!Number.isFinite(auditDepth) || auditDepth < 0) throw new Error(`Invalid depth: ${opts.depth}`);
+      const status = await runRuntimeStatus({ storePath: resolve(opts.store), auditDepth });
+      console.log(status.lines.join('\n'));
+    } catch (err) {
+      console.error('Runtime status failed:', err instanceof Error ? err.message : err);
       process.exit(1);
     }
   });

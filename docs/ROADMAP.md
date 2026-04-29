@@ -84,7 +84,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 44 route handoff scoring notes and scaffold.
 - [x] Add Slice 45 durable notification outbox blocks.
 - [x] Add Slice 46 local audit compaction/snapshot command.
-- [ ] Add Slice 47 runtime health/status command over local memory.
+- [x] Add Slice 47 runtime health/status command over local memory.
 - [ ] Add Slice 48 Heaper adapter migration checklist and contract gaps.
 
 ## Active Slice Queue
@@ -625,7 +625,7 @@ Validation:
 
 Status: implemented in `src/cli/audit-export.ts`; `agent-core audit-snapshot <heap#id> --store <path> --heap <heap>` creates bounded `audit-snapshot` metadata blocks with linked source refs, preserves raw blocks, and snapshots are visible through normal audit export.
 
-### Slice 47 — Runtime health/status command over local memory
+### Slice 47 — Runtime health/status command over local memory ✅
 
 Goal: add a local command summarizing active sessions, tasks, blockers, approvals, and recent daily continuity.
 
@@ -633,6 +633,8 @@ Validation:
 - reads only configured local memory store;
 - counts active/pending/blocked artifacts;
 - includes refs for drill-down via audit export.
+
+Status: implemented in `src/cli/runtime-status.ts`; `agent-core runtime-status --store <path>` summarizes sessions, task states, active blockers, pending approvals, notification outbox items, recent daily entries, and emits `audit-export` drill-down commands for each ref.
 
 ### Slice 48 — Heaper adapter migration checklist and contract gaps
 
