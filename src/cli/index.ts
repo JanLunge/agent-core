@@ -181,6 +181,11 @@ program
     const telegramToken = secretResolver?.resolve('TELEGRAM_BOT_TOKEN', 'telegram')
       ?? telegramConfig.token
       ?? process.env.TELEGRAM_BOT_TOKEN;
+    if (telegramConfig.enabled && !telegramToken) {
+      console.error('Telegram is enabled, but no bot token is available. Set TELEGRAM_BOT_TOKEN, configure telegram.token, or disable telegram.enabled.');
+      for (const fn of shutdownHandlers.reverse()) fn();
+      process.exit(1);
+    }
     if (telegramConfig.enabled && telegramToken) {
       const telegram = new TelegramConnector({
         token: telegramToken,
