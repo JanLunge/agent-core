@@ -31,7 +31,7 @@ This note captures the current gap between agent-core's local `HeaperMemory` sca
 
 - **Concurrency/atomicity:** `LocalHeaperMemory` rewrites a whole JSON file and is not safe for multiple writers. Real Heaper append/update/link operations need atomic semantics.
 - **Semantic retrieval:** `semanticSlice` is placeholder substring search; relevance, embeddings, time labels, and ranking are not modeled yet.
-- **Permissions enforcement:** Heap namespace permissions are represented in code/docs/tests, but the memory adapter itself does not enforce read/write authorization.
+- **Permissions enforcement:** Heap namespace permissions are represented in code/docs/tests, but local memory adapters are storage-only; human heap safety is enforced in the policy/proposal layer above the adapter.
 - **Schema validation:** Block `data` is mostly structural TypeScript. A real adapter may need runtime schemas or validation errors for malformed blocks.
 - **Pagination:** `search` uses a simple limit with no cursor. Broad local scans now go through `scanMemory`, which applies a bounded limit and exposes a `cursor-unavailable` placeholder until a real Heaper cursor/page API exists. Audit export traverses linked refs from a start block rather than scanning the whole store.
 - **Link semantics:** Directionality and relation types are not represented. All links are untyped `BlockRef[]` today.
@@ -59,7 +59,7 @@ Minimal adapter test pattern:
 
 ```ts
 import { describeHeaperMemoryContract } from './adapter-contract.test.js';
-import { HeaperClientMemory } from './heaper-client-memory.js';
+import { HeaperClientMemory } from './heaper-client.js';
 
 describeHeaperMemoryContract({
   name: 'HeaperClientMemory',
@@ -87,9 +87,23 @@ The contract intentionally checks behavior that runtime code depends on:
 - human/agent/persona heap names and permission-facing tags are not coerced;
 - optional `reopen` verifies blocks, links, and daily entries survive adapter restart.
 
+
+## Heaper adapter skeleton
+
+`src/heaper/heaper-client.ts` now contains a deliberately non-functional `HeaperClientMemory` skeleton. It captures the expected constructor shape (`endpoint`, `namespace`, `apiKeyEnv`, `enabled`) and implements the `HeaperMemory` interface, but every operation fails closed until a real Heaper client is available. Runtime selection remains `memory` by default and `local` for durable JSON storage; `runtime_memory.kind: heaper` requires `heaper_enabled: true` and still throws on operations.
+
+Missing before this can become functional:
+
+- concrete Heaper client package/API and request/response schemas;
+- authentication source and credential loading from `heaper_api_key_env`;
+- namespace/heap mapping, especially `human/*`, `agent/*`, and `persona/*`;
+- pagination/cursor behavior for `search` and `semanticSlice`;
+- conflict/revision behavior for `updateBlock`, `appendToDailyEntry`, and links;
+- explicit handling for auth/permission errors, retryable transport failures, and redaction-sensitive reads.
+
 ## Migration checklist
 
-- [ ] Add a real Heaper adapter implementing `HeaperMemory` without changing runtime callers.
+- [ ] Replace the non-functional `HeaperClientMemory` skeleton with a real Heaper adapter implementing `HeaperMemory` without changing runtime callers.
 - [ ] Run `describeHeaperMemoryContract` from `src/heaper/adapter-contract.test.ts` against the adapter.
 - [ ] Add adapter-specific tests for auth/permission failures, retryable network/storage failures, and conflict/revision behavior.
 - [ ] Decide and document link directionality/typing before relying on richer graph traversal.

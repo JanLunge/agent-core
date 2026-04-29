@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { MasterConfigSchema } from '../config/schema.js';
+import { HeaperClientMemory } from '../heaper/heaper-client.js';
 import { createRuntimeMemory } from './memory-config.js';
 
 describe('createRuntimeMemory', () => {
@@ -44,5 +45,36 @@ describe('createRuntimeMemory', () => {
 
     expect(afterReadOnlyLoad).toBe(before);
     await expect(second.memory.getBlock({ heap: block.heap, id: block.id })).resolves.toMatchObject({ data: { marker: 'keep' } });
+  });
+
+  it('keeps the future Heaper adapter behind an explicit feature flag', () => {
+    const config = MasterConfigSchema.parse({
+      runtime_memory: { kind: 'heaper', heaper_endpoint: 'https://heaper.example.test' },
+    });
+
+    expect(() => createRuntimeMemory({ baseDir: process.cwd(), config: config.runtime_memory })).toThrow(
+      'runtime_memory.kind=heaper requires heaper_enabled=true',
+    );
+  });
+
+  it('can construct the Heaper adapter skeleton but operations fail closed', async () => {
+    const config = MasterConfigSchema.parse({
+      runtime_memory: {
+        kind: 'heaper',
+        heaper_enabled: true,
+        heaper_endpoint: 'https://heaper.example.test',
+        heaper_namespace: 'agent-core-dev',
+        heaper_api_key_env: 'HEAPER_API_KEY',
+      },
+    });
+
+    const selection = createRuntimeMemory({ baseDir: process.cwd(), config: config.runtime_memory });
+
+    expect(selection.kind).toBe('heaper');
+    expect(selection.path).toBeUndefined();
+    expect(selection.memory).toBeInstanceOf(HeaperClientMemory);
+    await expect(selection.memory.search('', { heaps: ['agent/runtime'] })).rejects.toThrow(
+      'HeaperClientMemory.search is not implemented',
+    );
   });
 });

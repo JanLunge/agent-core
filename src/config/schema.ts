@@ -95,10 +95,15 @@ export type EmbeddingConfig = z.infer<typeof EmbeddingConfigSchema>;
 // --- Runtime memory ---
 
 export const RuntimeMemoryConfigSchema = z.object({
-  kind: z.enum(['memory', 'local']).default('memory'),
+  kind: z.enum(['memory', 'local', 'heaper']).default('memory'),
   /** Path for local durable HeaperMemory JSON storage. Relative to base dir when not absolute. */
   path: z.string().optional(),
   id_prefix: z.string().optional(),
+  /** Feature flag for the non-functional future Heaper adapter skeleton. */
+  heaper_enabled: z.boolean().optional(),
+  heaper_endpoint: z.string().optional(),
+  heaper_namespace: z.string().optional(),
+  heaper_api_key_env: z.string().optional(),
 }).default({});
 
 export type RuntimeMemoryConfig = z.infer<typeof RuntimeMemoryConfigSchema>;

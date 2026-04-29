@@ -95,7 +95,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 55 semantic time-range translation helper.
 - [x] Add Slice 56 pagination-safe memory scan wrapper.
 - [x] Add Slice 57 permission policy adapter boundary tests.
-- [ ] Add Slice 58 Heaper adapter skeleton behind feature flag.
+- [x] Add Slice 58 Heaper adapter skeleton behind feature flag.
 
 ## Active Slice Queue
 
@@ -756,7 +756,7 @@ Validation:
 
 Status: implemented in `src/heaper/permission-boundary.test.ts`; tests document that local memory adapters are storage-only, human heap protection is enforced by the policy/proposal layer above the adapter, and agent/persona heaps remain writable where policy allows.
 
-### Slice 58 — Heaper adapter skeleton behind feature flag
+### Slice 58 — Heaper adapter skeleton behind feature flag ✅
 
 Goal: add a non-functional adapter skeleton showing where real Heaper client wiring will live.
 
@@ -764,6 +764,8 @@ Validation:
 - skeleton implements constructor/config shape but fails closed for operations;
 - runtime config can select local adapter by default;
 - docs explain what credentials/client are still missing.
+
+Status: implemented in `src/heaper/heaper-client.ts`; runtime memory config accepts `kind: heaper` only with explicit `heaper_enabled: true`, constructs the skeleton, and fails closed for all operations until a real Heaper client is wired. Local/default adapters remain the runtime path.
 
 ## Reporting Template
 

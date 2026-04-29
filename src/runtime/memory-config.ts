@@ -2,9 +2,10 @@ import { resolve } from 'node:path';
 import type { MasterConfig } from '../config/schema.js';
 import { InMemoryHeaperMemory } from '../heaper/memory.js';
 import { LocalHeaperMemory } from '../heaper/local-storage.js';
+import { HeaperClientMemory } from '../heaper/heaper-client.js';
 import type { HeaperMemory } from '../heaper/types.js';
 
-export type RuntimeMemoryKind = 'memory' | 'local';
+export type RuntimeMemoryKind = 'memory' | 'local' | 'heaper';
 
 export interface RuntimeMemorySelection {
   kind: RuntimeMemoryKind;
@@ -28,6 +29,22 @@ export function createRuntimeMemory(input: CreateRuntimeMemoryInput): RuntimeMem
       kind: 'local',
       path,
       memory: new LocalHeaperMemory({ filePath: path, idPrefix, now: input.now }),
+    };
+  }
+
+  if (config.kind === 'heaper') {
+    if (!config.heaper_enabled) {
+      throw new Error('runtime_memory.kind=heaper requires heaper_enabled=true; the Heaper adapter is a non-functional skeleton');
+    }
+
+    return {
+      kind: 'heaper',
+      memory: new HeaperClientMemory({
+        enabled: config.heaper_enabled,
+        endpoint: config.heaper_endpoint,
+        namespace: config.heaper_namespace,
+        apiKeyEnv: config.heaper_api_key_env,
+      }),
     };
   }
 
