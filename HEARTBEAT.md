@@ -57,6 +57,8 @@ As of 2026-04-29, completed slices up to Slice 58 are alpha scaffolding. New wor
 
 Beta work must aim at a dogfoodable working product that is easy to debug and develop on. Every beta slice should move a real runtime path forward, remove a concrete blocker, or make the product easier to inspect/debug.
 
+Product-manager responsibility: do not count internal tests, scaffolds, commits, or green checkmarks as success unless they fulfill an end-user requirement. For each beta slice, identify the user-visible behavior and the acceptance check that proves a person can actually use it.
+
 Fake stubs/test doubles are not product progress by themselves. If a fake/stub appears on the dogfood path, list it as a blocker/debt item and create a beta task to replace it. Fake agents are allowed in unit tests only when explicitly labelled as test doubles.
 
 ## Product Check-in Trigger

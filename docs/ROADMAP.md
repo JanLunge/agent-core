@@ -111,6 +111,7 @@ Beta goal:
 
 Beta rules:
 
+- Product-manager rule: requirements are only fulfilled when the end-user path works, not when internal scaffolding/tests/badges pass. Each beta slice must name the user-visible capability it improves and the end-user acceptance check that proves it.
 - Every beta slice must move a real product path forward, not merely add plausible architecture.
 - Prefer vertical integration over isolated modules.
 - The primary target is a working Telegram/runtime path with durable routing, session/memory, real agent/provider execution, tool/approval safety, notifications, and audit/status/debuggability.

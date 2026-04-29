@@ -65,6 +65,7 @@ A live Telegram send is intentionally not Beta Slice 1. First the local/replay p
 
 ## Validation Standard Going Forward
 
+- End-user acceptance beats internal proof. A slice is not done until there is a believable user-facing scenario, a command/replay/live check that exercises it, or an explicit blocker explaining why the user path cannot yet work.
 - Unit tests with fakes validate mechanics only.
 - Product progress requires at least one of:
   - real provider boundary execution;
