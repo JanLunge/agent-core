@@ -1,5 +1,6 @@
 import type { BlockRef, HeapName, HeaperBlock } from '../heaper/types.js';
 import { LocalHeaperMemory } from '../heaper/local-storage.js';
+import { scanMemory } from '../heaper/scan.js';
 import type { TaskBlockData } from '../heaper/task-blocks.js';
 import type { ApprovalRequestData, ProposedOperation } from '../tools/approval-requests.js';
 
@@ -9,6 +10,7 @@ export interface RunTaskResumeOptions {
   approvalHeaps?: HeapName[];
   markReady?: boolean;
   now?: string;
+  scanLimit?: number;
 }
 
 export interface ApprovalResumeItem {
@@ -29,7 +31,8 @@ export interface TaskResumeSummary {
 
 export async function runTaskResume(options: RunTaskResumeOptions): Promise<TaskResumeSummary> {
   const memory = new LocalHeaperMemory({ filePath: options.storePath });
-  const tasks = (await memory.search('', { heaps: options.taskHeaps, types: ['task'], limit: Number.POSITIVE_INFINITY }))
+  const taskScan = await scanMemory({ memory, filters: { heaps: options.taskHeaps, types: ['task'] }, maxResults: options.scanLimit });
+  const tasks = taskScan.blocks
     .filter(isApprovalResumeTask)
     .filter((task) => task.data.status === 'pending')
     .sort((a, b) => a.updatedAt.localeCompare(b.updatedAt) || a.id.localeCompare(b.id));
@@ -95,7 +98,7 @@ async function findApprovalForTask(
   const related = await memory.getRelatedBlocks(refFor(task));
   const candidates = [
     ...related,
-    ...(approvalId ? await memory.search('', { heaps: approvalHeaps, types: ['proposal'], limit: Number.POSITIVE_INFINITY }) : []),
+    ...(approvalId ? (await scanMemory({ memory, filters: { heaps: approvalHeaps, types: ['proposal'] } })).blocks : []),
   ];
   return candidates.find((block): block is HeaperBlock<ApprovalRequestData> => (
     block.type === 'proposal'

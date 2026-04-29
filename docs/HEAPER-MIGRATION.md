@@ -33,7 +33,7 @@ This note captures the current gap between agent-core's local `HeaperMemory` sca
 - **Semantic retrieval:** `semanticSlice` is placeholder substring search; relevance, embeddings, time labels, and ranking are not modeled yet.
 - **Permissions enforcement:** Heap namespace permissions are represented in code/docs/tests, but the memory adapter itself does not enforce read/write authorization.
 - **Schema validation:** Block `data` is mostly structural TypeScript. A real adapter may need runtime schemas or validation errors for malformed blocks.
-- **Pagination:** `search` uses a simple limit with no cursor. Runtime status/audit commands may need pagination for large stores.
+- **Pagination:** `search` uses a simple limit with no cursor. Broad local scans now go through `scanMemory`, which applies a bounded limit and exposes a `cursor-unavailable` placeholder until a real Heaper cursor/page API exists. Audit export traverses linked refs from a start block rather than scanning the whole store.
 - **Link semantics:** Directionality and relation types are not represented. All links are untyped `BlockRef[]` today.
 - **Conflict handling:** `updateBlock` has no revision/etag support. Real Heaper should expose or hide conflict retries intentionally.
 - **Redaction boundary:** Audit export redacts at render time. Sensitive data can still be present in local blocks when source operations store it.
@@ -94,7 +94,7 @@ The contract intentionally checks behavior that runtime code depends on:
 - [ ] Add adapter-specific tests for auth/permission failures, retryable network/storage failures, and conflict/revision behavior.
 - [ ] Decide and document link directionality/typing before relying on richer graph traversal.
 - [ ] Implement semantic time-range translation for `semanticSlice`.
-- [ ] Add pagination/cursor support or a bounded iteration wrapper before using production-sized stores.
+- [x] Add pagination/cursor support or a bounded iteration wrapper before using production-sized stores.
 - [ ] Confirm daily append atomicity with concurrent worker/runtime writes.
 - [ ] Audit all concrete-id assertions and keep them limited to local fixture tests.
 - [ ] Validate that audit export/status commands can inspect Heaper-backed refs without leaking sensitive data.

@@ -1,11 +1,13 @@
 import type { BlockRef, HeaperBlock } from '../heaper/types.js';
 import { LocalHeaperMemory } from '../heaper/local-storage.js';
+import { scanMemory } from '../heaper/scan.js';
 
 export interface RuntimeStatusOptions {
   storePath: string;
   auditDepth?: number;
   now?: string;
   recentDailyLimit?: number;
+  scanLimit?: number;
 }
 
 export interface RuntimeStatusSummary {
@@ -38,7 +40,8 @@ const DEFAULT_RECENT_DAILY_LIMIT = 3;
 
 export async function runRuntimeStatus(options: RuntimeStatusOptions): Promise<RuntimeStatusSummary> {
   const memory = new LocalHeaperMemory({ filePath: options.storePath });
-  const blocks = await memory.search('', { limit: Number.POSITIVE_INFINITY });
+  const scan = await scanMemory({ memory, maxResults: options.scanLimit });
+  const blocks = scan.blocks;
   const sessions = byCreated(blocks.filter((block) => block.type === 'session' && block.tags.includes('session')));
   const tasks = byCreated(blocks.filter((block) => block.type === 'task' && block.tags.includes('task')));
   const activeBlockers = byCreated(blocks.filter((block) => block.tags.includes('runtime-blocker') && statusFor(block) === 'active'));

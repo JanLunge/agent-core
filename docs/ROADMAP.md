@@ -93,7 +93,7 @@ If a feedback checkpoint is reached during the night, write the question into lo
 - [x] Add Slice 53 task resume command for approval-resume tasks.
 - [x] Add Slice 54 typed link relation design note.
 - [x] Add Slice 55 semantic time-range translation helper.
-- [ ] Add Slice 56 pagination-safe memory scan wrapper.
+- [x] Add Slice 56 pagination-safe memory scan wrapper.
 - [ ] Add Slice 57 permission policy adapter boundary tests.
 - [ ] Add Slice 58 Heaper adapter skeleton behind feature flag.
 
@@ -734,7 +734,7 @@ Validation:
 
 Status: implemented in `src/heaper/time-range.ts`; `today`, `yesterday`, and `last-7-days` translate to explicit UTC ranges under an injected clock, explicit `timeRange` wins over labels, and both local memory adapters now apply translated filters in `semanticSlice`.
 
-### Slice 56 — Pagination-safe memory scan wrapper
+### Slice 56 — Pagination-safe memory scan wrapper ✅
 
 Goal: avoid future production commands assuming unbounded `search('', { limit: Infinity })`.
 
@@ -742,6 +742,8 @@ Validation:
 - wrapper expresses bounded scans with future cursor placeholder;
 - runtime-status/audit helpers can migrate to it;
 - docs mark local-only full scans clearly.
+
+Status: implemented in `src/heaper/scan.ts`; broad command scans now use `scanMemory`, which applies a bounded default limit, rejects unbounded/invalid limits, and returns `cursor-unavailable` when the limit is hit. Runtime-status and task-resume now use it; audit export remains ref-traversal based rather than whole-store scanning.
 
 ### Slice 57 — Permission policy adapter boundary tests
 
